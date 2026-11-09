@@ -1,0 +1,35 @@
+name: CI
+
+# Every pull request and every push to main runs the same gate as `npm test` locally:
+# unit checks, then headless Playwright against the Firebase Auth and Firestore emulators.
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: test
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+
+      # Keep equal to mise.toml.
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24.12.0
+          cache: npm
+
+      # The Firestore emulator needs Java 21. Keep equal to mise.toml.
+      - uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: "21"
+
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      - run: npm test

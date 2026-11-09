@@ -1,0 +1,58 @@
+:root {
+  --bg: #faf8f5;
+  --fg: #222;
+  --muted: #666;
+  --card: #fff;
+  --line: #e4e0da;
+  --accent: #c2410c;
+  color-scheme: light dark;
+}
+@media (prefers-color-scheme: dark) {
+  :root { --bg: #161514; --fg: #eee; --muted: #aaa; --card: #211f1d; --line: #3a3633; --accent: #fb923c; }
+}
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+body { margin: 0; background: var(--bg); color: var(--fg); font: 16px/1.5 system-ui, sans-serif; }
+main { max-width: 960px; margin: 0 auto; padding: 24px 16px; }
+a { color: var(--accent); }
+h1 { margin: 0 0 12px; }
+
+#gate { max-width: 320px; margin: 15vh auto; display: grid; gap: 8px; }
+input, button { font: inherit; padding: 8px 10px; border-radius: 6px; border: 1px solid var(--line); background: var(--card); color: var(--fg); }
+button { background: var(--accent); color: #fff; border: 0; cursor: pointer; }
+button.link { background: none; color: var(--muted); text-decoration: underline; padding: 4px 0; font-size: .85rem; }
+.error { color: var(--accent); margin: 0; }
+
+#tabs { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 12px; }
+#tabs a { padding: 4px 12px; border: 1px solid var(--line); border-radius: 999px; text-decoration: none; color: var(--fg); }
+#tabs a[aria-current="page"] { background: var(--accent); border-color: var(--accent); color: #fff; }
+#tab-description { color: var(--muted); }
+
+#items { list-style: none; padding: 0; display: grid; gap: 12px; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); }
+.item { background: var(--card); border: 1px solid var(--line); border-radius: 10px; overflow: hidden; display: flex; flex-direction: column; }
+.item img { width: 100%; aspect-ratio: 4 / 3; object-fit: contain; background: #fff; }
+.item-body { padding: 12px; }
+.item h2 { font-size: 1.05rem; margin: 0 0 4px; }
+.price { font-weight: 600; margin: 0 0 4px; }
+.description { margin: 0 0 8px; white-space: pre-line; }
+.find-in { color: var(--muted); font-size: .85rem; margin: 0; }
+
+/* Owner editing */
+.owner-only { display: none; }
+body.owner .owner-only { display: flex; }
+.toolbar { gap: 6px; flex-wrap: wrap; margin-bottom: 12px; }
+button.secondary { background: none; color: var(--fg); border: 1px solid var(--line); }
+button.danger { background: none; color: #dc2626; border: 1px solid #dc2626; margin-left: auto; }
+body.owner [draggable="true"] { cursor: grab; }
+.item button.link { margin-top: 6px; }
+footer { margin-top: 32px; text-align: center; }
+
+dialog { border: 1px solid var(--line); border-radius: 10px; background: var(--card); color: var(--fg); width: min(480px, calc(100vw - 32px)); }
+dialog::backdrop { background: rgb(0 0 0 / .4); }
+dialog form { display: grid; gap: 10px; }
+dialog h2 { margin: 0; }
+dialog label { display: grid; gap: 4px; font-size: .9rem; }
+textarea, select { font: inherit; padding: 8px 10px; border-radius: 6px; border: 1px solid var(--line); background: var(--bg); color: var(--fg); }
+dialog input { background: var(--bg); }
+.row { display: grid; grid-template-columns: 1fr 90px; gap: 8px; }
+.actions { display: flex; gap: 8px; }
