@@ -1,6 +1,6 @@
 // The add popup: the bookmarklet opens it with the shop page's data in the URL hash.
 // Without a hash it is a plain manual add form.
-import { OWNER_UID, EMULATOR } from "./config.js";
+import { OWNER_UID, EMULATOR, WORKER_URL } from "./config.js";
 import { parsePrice, safeUrl, nextOrder } from "./util.js";
 import { auth, fbAuth, fbStore, tabsCol, itemsCol, signInOwnerWithGoogle } from "./firebase.js";
 
@@ -34,17 +34,17 @@ $("owner-login").addEventListener("click", () => signInOwnerWithGoogle().catch((
 // The hash comes from whatever page the bookmarklet ran on, so this is the only guard on it:
 // keep known fields of the right type and length. The description is never taken from it.
 function readHash() {
-  try {
-    const d = JSON.parse(decodeURIComponent(location.hash.slice(1)));
-    const str = (v, max) => (typeof v === "string" ? v.slice(0, max) : "");
-    const url = (v) => (typeof v === "string" && v.length <= MAX_URL ? safeUrl(v) : null);
-    return {
-      url: url(d.url) ?? "", title: str(d.title, 200), price: str(d.price, 32), currency: str(d.currency, 3),
-      images: Array.isArray(d.images) ? d.images.map(url).filter(Boolean).slice(0, 8) : [],
-    };
-  } catch {
-    return { url: "", title: "", price: "", currency: "", images: [] };
-  }
+  try { return clean(JSON.parse(decodeURIComponent(location.hash.slice(1)))); } catch { return clean({}); }
+}
+
+// Same guard for every source of page data (hash, Worker): known fields, right type and length.
+function clean(d) {
+  const str = (v, max) => (typeof v === "string" ? v.slice(0, max) : "");
+  const url = (v) => (typeof v === "string" && v.length <= MAX_URL ? safeUrl(v) : null);
+  return {
+    url: url(d?.url) ?? "", title: str(d?.title, 200), price: str(d?.price, 32), currency: str(d?.currency, 3),
+    images: Array.isArray(d?.images) ? d.images.map(url).filter(Boolean).slice(0, 8) : [],
+  };
 }
 
 async function fillForm() {
@@ -55,21 +55,28 @@ async function fillForm() {
   try { last = localStorage.getItem(LAST_TAB); } catch { /* storage may be blocked */ }
   if (tabs.some((t) => t.id === last)) select.value = last;
 
-  fillFields();
+  fillFields(page);
 }
 
-function fillFields() {
-  form.elements.title.value = page.title;
-  form.elements.url.value = safeUrl(page.url) ?? "";
-  const price = parsePrice(page.price);
-  form.elements.price.value = price ?? "";
-  if (/^[A-Za-z]{3}$/.test(page.currency)) form.elements.currency.value = page.currency.toUpperCase();
-  form.elements.customImage.value = "";
+// Fills the form from page data (hash or Worker). Rule: only empty fields are filled, so what the
+// owner already typed is never overwritten. Currency follows the price, images only come in when
+// none is offered yet and no custom image URL is typed.
+function fillFields(d) {
+  const f = form.elements;
+  const priceWasEmpty = !f.price.value.trim();
+  if (!f.title.value.trim()) f.title.value = d.title;
+  if (!f.url.value.trim()) f.url.value = safeUrl(d.url) ?? "";
+  const price = parsePrice(d.price);
+  if (priceWasEmpty) f.price.value = price ?? "";
+  if (priceWasEmpty && /^[A-Za-z]{3}$/.test(d.currency)) f.currency.value = d.currency.toUpperCase();
   show("saved", false);
 
-  const choices = page.images.map((src, i) => imageChoice(src, i === 0));
-  choices.push(imageChoice(null, page.images.length === 0));
-  $("images").replaceChildren(...choices);
+  const noImages = ![...$("images").querySelectorAll('input[name="image"]')].some((r) => r.value) && !f.customImage.value.trim();
+  if (noImages) {
+    const choices = d.images.map((src, i) => imageChoice(src, i === 0));
+    choices.push(imageChoice(null, d.images.length === 0));
+    $("images").replaceChildren(...choices);
+  }
   show("add-form");
 }
 
@@ -111,5 +118,54 @@ form.addEventListener("submit", async (e) => {
   } catch (err) {
     $("add-error").textContent = `Nie udało się zapisać: ${err.code ?? err.message}`;
     show("add-error");
+  }
+});
+
+// --- fetch from a pasted link (phone flow, decisions 17 and 18) ---
+
+const FETCH_TIMEOUT_MS = EMULATOR ? Number(new URLSearchParams(location.search).get("fetchTimeout")) || 10_000 : 10_000;
+const fetchBtn = $("fetch-link");
+const note = (text, isError = false) => {
+  const el = $("fetch-status");
+  el.textContent = text;
+  el.className = isError ? "error" : "";
+  el.hidden = !text;
+};
+
+const WORKER_ERRORS = {
+  400: "Ten link nie wygląda na stronę sklepu. Sprawdź adres.",
+  401: "Sesja wygasła. Zaloguj się ponownie i spróbuj jeszcze raz.",
+  403: "To konto nie może pobierać danych z linków.",
+  502: "Sklep nie oddał strony (może blokować boty). Wpisz dane ręcznie.",
+  503: "Usługa chwilowo niedostępna. Spróbuj za chwilę albo wpisz dane ręcznie.",
+};
+
+fetchBtn.addEventListener("click", async () => {
+  if (fetchBtn.disabled) return;
+  const link = safeUrl(form.elements.url.value.trim());
+  if (!link) { note("Wklej poprawny link do sklepu (https://…).", true); return; }
+  fetchBtn.disabled = true;
+  note("Pobieram dane…");
+  const ctl = new AbortController();
+  const timer = setTimeout(() => ctl.abort(), FETCH_TIMEOUT_MS);
+  try {
+    const token = await auth.currentUser.getIdToken();
+    const res = await fetch(WORKER_URL + "/extract", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+      body: JSON.stringify({ url: link }),
+      signal: ctl.signal,
+    });
+    if (!res.ok) { note(WORKER_ERRORS[res.status] ?? `Nie udało się pobrać danych (błąd ${res.status}). Wpisz dane ręcznie.`, true); return; }
+    const got = clean(await res.json());
+    if (!got.title && !got.price && !got.images.length) { note("Nic nie znaleziono na tej stronie. Wpisz dane ręcznie.", true); return; }
+    fillFields(got);
+    note("Dane pobrane. Uzupełniono tylko puste pola; sprawdź i zapisz.");
+  } catch (e) {
+    note(ctl.signal.aborted ? "Pobieranie trwa za długo. Spróbuj jeszcze raz albo wpisz dane ręcznie."
+      : "Brak połączenia z usługą pobierania. Wpisz dane ręcznie.", true);
+  } finally {
+    clearTimeout(timer);
+    fetchBtn.disabled = false;
   }
 });
