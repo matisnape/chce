@@ -1,0 +1,18 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // UIDs are opaque identifiers, not credentials. Checking a specific UID matters:
+    // anyone can create a Firebase account with the public apiKey, so "signed in" proves nothing.
+    function ownerUid() { return 'OWNER_UID'; }
+    function guestUid() { return 'GUEST_UID'; }
+
+    function isOwner() { return request.auth != null && request.auth.uid == ownerUid(); }
+    function isGuest() { return request.auth != null && request.auth.uid == guestUid(); }
+
+    // Recursive wildcard also matches the list document itself (rules v2).
+    match /lists/{listId}/{document=**} {
+      allow read: if isOwner() || isGuest();
+      allow write: if isOwner();
+    }
+  }
+}

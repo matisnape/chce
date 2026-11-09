@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="pl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex, nofollow">
+  <meta name="referrer" content="no-referrer">
+  <title>chce</title>
+  <link rel="stylesheet" href="style.css">
+  <script type="module" src="js/app.js"></script>
+</head>
+<body>
+  <main>
+    <section id="loading">Ładowanie…</section>
+
+    <form id="gate" hidden>
+      <h1>chce</h1>
+      <label for="password">Hasło</label>
+      <input id="password" type="password" autocomplete="current-password" required autofocus>
+      <button type="submit">Wejdź</button>
+      <p id="gate-error" class="error" hidden></p>
+    </form>
+
+    <section id="list" hidden>
+      <header>
+        <h1 id="list-title">chce</h1>
+        <nav id="tabs" aria-label="Zakładki"></nav>
+      </header>
+      <p id="tab-description"></p>
+      <ul id="items"></ul>
+      <p id="empty" hidden>Pusto.</p>
+    </section>
+  </main>
+</body>
+</html>
