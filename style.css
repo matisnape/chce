@@ -11,6 +11,7 @@
   :root { --bg: #161514; --fg: #eee; --muted: #aaa; --card: #211f1d; --line: #3a3633; --accent: #fb923c; }
 }
 * { box-sizing: border-box; }
+[hidden] { display: none !important; }
 body { margin: 0; background: var(--bg); color: var(--fg); font: 16px/1.5 system-ui, sans-serif; }
 main { max-width: 960px; margin: 0 auto; padding: 24px 16px; }
 a { color: var(--accent); }

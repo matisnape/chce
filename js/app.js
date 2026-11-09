@@ -14,7 +14,13 @@ const show = (id, on = true) => { $(id).hidden = !on; };
 // Firebase keeps the session in the browser, so the password is typed once.
 onAuthStateChanged(auth, (user) => {
   show("loading", false);
-  if (user) { show("gate", false); loadList(); } else { show("gate"); }
+  if (user) {
+    show("gate", false);
+    loadList().catch((e) => {
+      $("list-title").textContent = e.code === "permission-denied" ? "Brak dostępu do listy." : `Błąd: ${e.code ?? e.message}`;
+      show("list");
+    });
+  } else { show("gate"); }
 });
 
 $("gate").addEventListener("submit", async (e) => {
