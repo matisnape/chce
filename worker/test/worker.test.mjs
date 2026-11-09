@@ -1,6 +1,7 @@
-import test from "node:test";
+import test, { after } from "node:test";
+import http from "node:http";
 import assert from "node:assert/strict";
-import { createHandler, FetchError, extractFromHtml, slimHtml } from "../src/index.js";
+import { createHandler, createFetchPage, BadTarget, FetchError, extractFromHtml, slimHtml } from "../src/index.js";
 
 const ENV = {
   OWNER_UID: "owner-uid",
@@ -22,7 +23,8 @@ async function token({ key = pair.privateKey, header = {}, claims = {} } = {}) {
   const p = b64u(JSON.stringify({
     aud: "proj", iss: "https://securetoken.google.com/proj", sub: "owner-uid", iat: t - 10, exp: t + 3600, ...claims,
   }));
-  const sig = header.alg === "none" ? "" : b64u(await crypto.subtle.sign("RSASSA-PKCS1-v1_5", key, Buffer.from(`${h}.${p}`)));
+  // Always a valid RS256 signature, so a wrong `alg` header is rejected by the alg check and by nothing else.
+  const sig = b64u(await crypto.subtle.sign("RSASSA-PKCS1-v1_5", key, Buffer.from(`${h}.${p}`)));
   return `${h}.${p}.${sig}`;
 }
 
@@ -62,8 +64,15 @@ test("iat in the future gives 401", async () => {
   assert.equal((await post(handler(), await token({ claims: { iat } }))).status, 401);
 });
 
-test("alg none gives 401", async () => {
-  assert.equal((await post(handler(), await token({ header: { alg: "none" } }))).status, 401);
+test("a header alg other than RS256 gives 401 even with a valid signature", async () => {
+  for (const alg of ["none", "HS256"]) {
+    assert.equal((await post(handler(), await token({ header: { alg } }))).status, 401, alg);
+  }
+});
+
+test("a token without a sub gives 401, not 403", async () => {
+  assert.equal((await post(handler(), await token({ claims: { sub: "" } }))).status, 401);
+  assert.equal((await post(handler(), await token({ claims: { sub: undefined } }))).status, 401);
 });
 
 test("another user's valid token gives 403", async () => {
@@ -184,4 +193,91 @@ test("keys are refetched once max-age has passed, not before", async () => {
   clock += 2_000;
   assert.equal((await post(h, tok)).status, 200);
   assert.equal(calls, 2);
+});
+
+test("ports other than 80 and 443 give 400", async () => {
+  const never = async () => assert.fail("must not fetch");
+  const tok = await token();
+  for (const url of ["http://shop.example:22/x", "https://shop.example:8443/x", "http://shop.example:6379/"]) {
+    assert.equal((await post(handler(never), tok, { url })).status, 400, url);
+  }
+  for (const url of ["http://shop.example:80/x", "https://shop.example:443/x", "https://shop.example/x"]) {
+    assert.equal((await post(handler(page("<title>x</title>")), tok, { url })).status, 200, url);
+  }
+});
+
+// --- createFetchPage against a local server; the fetch stand-in maps http(s)://shop.test onto it ---
+
+const PAGE_CAP = 2 * 1024 * 1024;
+const server = http.createServer((req, res) => {
+  const send = (status, headers, body = "") => { res.writeHead(status, headers); res.end(body); };
+  const html = { "Content-Type": "text/html; charset=utf-8" };
+  switch (req.url) {
+    case "/html": return send(200, html, "<title>ok</title>");
+    case "/json": return send(200, { "Content-Type": "application/json" }, "{}");
+    case "/big": return send(200, html, `<title>start</title>${"a".repeat(3 * 1024 * 1024)}`);
+    case "/pl": return send(200, { "Content-Type": "text/html; charset=windows-1250" }, Buffer.concat([Buffer.from("<title>z"), Buffer.from([0xb3]), Buffer.from("ota</title>")]));
+    case "/badcharset": return send(200, { "Content-Type": "text/html; charset=nope-9" }, "<title>ok</title>");
+    case "/rel": return send(302, { Location: "/html" });
+    case "/chain": return send(302, { Location: "/rel" });
+    case "/to-ip": return send(302, { Location: "http://127.0.0.1/" });
+    case "/to-self": return send(302, { Location: `http://127.0.0.1:${server.address().port}/html` });
+    case "/to-port": return send(302, { Location: "http://shop.test:22/x" });
+    case "/to-file": return send(302, { Location: "file:///etc/passwd" });
+    case "/loop": return send(302, { Location: "/loop" });
+    default: return send(404, html, "nope");
+  }
+});
+await new Promise((ok) => server.listen(0, "127.0.0.1", ok));
+after(() => { server.closeAllConnections?.(); server.close(); });
+const toLocal = (u, init) => {
+  const x = new URL(u);
+  assert.equal(x.hostname, "shop.test", `fetched ${u}`); // anything else would be a request the Worker should have refused
+  x.protocol = "http:"; x.host = `127.0.0.1:${server.address().port}`;
+  return fetch(x, init);
+};
+const fetchPage = createFetchPage(toLocal);
+const refused = (status) => (e) => e instanceof FetchError && e.status === status;
+
+test("fetchPage returns html and the final url", async () => {
+  assert.deepEqual(await fetchPage("http://shop.test/html"), { html: "<title>ok</title>", finalUrl: "http://shop.test/html" });
+});
+
+test("fetchPage rejects a non-HTML content type", async () => {
+  await assert.rejects(fetchPage("http://shop.test/json"), refused(200));
+});
+
+test("fetchPage rejects an HTTP error status", async () => {
+  await assert.rejects(fetchPage("http://shop.test/missing"), refused(404));
+});
+
+test("fetchPage truncates a body over the cap", async () => {
+  const { html } = await fetchPage("http://shop.test/big");
+  assert.equal(html.length, PAGE_CAP);
+  assert.ok(html.startsWith("<title>start</title>"));
+});
+
+test("fetchPage decodes the charset from Content-Type, and falls back to utf-8 for an unknown one", async () => {
+  assert.equal((await fetchPage("http://shop.test/pl")).html, "<title>złota</title>");
+  assert.equal((await fetchPage("http://shop.test/badcharset")).html, "<title>ok</title>");
+});
+
+test("fetchPage follows relative redirects and reports the final url", async () => {
+  assert.deepEqual(await fetchPage("http://shop.test/chain"), { html: "<title>ok</title>", finalUrl: "http://shop.test/html" });
+});
+
+test("fetchPage refuses a redirect to an IP literal, a bad port or a non-http scheme", async () => {
+  for (const path of ["/to-ip", "/to-self", "/to-port", "/to-file"]) {
+    await assert.rejects(fetchPage(`http://shop.test${path}`), BadTarget, path);
+  }
+});
+
+test("a redirect to 127.0.0.1 gives 400 through the handler", async () => {
+  const res = await post(handler(fetchPage), await token(), { url: "http://shop.test/to-ip" });
+  assert.equal(res.status, 400);
+  assert.deepEqual(await res.json(), { error: "bad_url" });
+});
+
+test("fetchPage gives up after 5 redirects", async () => {
+  await assert.rejects(fetchPage("http://shop.test/loop"), refused(0));
 });
