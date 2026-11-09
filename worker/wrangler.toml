@@ -1,0 +1,10 @@
+name = "chce"
+main = "src/index.js"
+compatibility_date = "2026-10-01"
+workers_dev = true
+
+# Identifiers, not secrets.
+[vars]
+OWNER_UID = "bfKB1t30oIcRYkswE73omAIvpok1"
+FIREBASE_PROJECT_ID = "chceto-843ed"
+ALLOWED_ORIGINS = "https://anks.pl,http://127.0.0.1:4173,http://localhost:4173"
