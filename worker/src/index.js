@@ -4,6 +4,9 @@ import { extract } from "../../js/extract.js";
 
 const JWK_URL = "https://www.googleapis.com/service_accounts/v1/jwk/securetoken@system.gserviceaccount.com";
 const SKEW = 60;
+const REFETCH_MS = 60_000; // at most one JWK refetch per minute per isolate
+const MAX_HOPS = 5;
+const TIMEOUT_MS = 6_000;
 const MAX_BYTES = 2 * 1024 * 1024;
 const UA = "Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.5 Mobile/15E148 Safari/604.1";
 
@@ -13,7 +16,21 @@ const json = (s) => JSON.parse(new TextDecoder().decode(b64(s)));
 async function defaultFetchKeys() {
   const r = await fetch(JWK_URL);
   if (!r.ok) throw new Error("jwk fetch failed");
-  return (await r.json()).keys;
+  const maxAge = Number(/max-age=(\d+)/.exec(r.headers.get("cache-control") ?? "")?.[1] ?? 300);
+  return { keys: (await r.json()).keys, maxAge };
+}
+
+// Cached key for `kid`; refetches when the kid is unknown or max-age ran out, but never twice within REFETCH_MS.
+async function findKey(kid, { fetchKeys, now, cache }) {
+  const t = now();
+  let jwk = cache.keys?.find((k) => k.kid === kid);
+  if ((!jwk || t >= cache.expires) && t - cache.fetchedAt >= REFETCH_MS) {
+    cache.fetchedAt = t; // set before the await so a failing or slow fetch is throttled too
+    const { keys, maxAge } = await fetchKeys();
+    cache.keys = keys; cache.expires = t + maxAge * 1000;
+    jwk = keys.find((k) => k.kid === kid);
+  }
+  return jwk;
 }
 
 // Returns the verified claims, or throws.
@@ -22,8 +39,7 @@ async function verifyToken(token, env, { fetchKeys, now, cache }) {
   if (!s || extra !== undefined) throw new Error("malformed");
   const header = json(h);
   if (header.alg !== "RS256" || !header.kid) throw new Error("alg");
-  let jwk = cache.keys?.find((k) => k.kid === header.kid);
-  if (!jwk) { cache.keys = await fetchKeys(); jwk = cache.keys.find((k) => k.kid === header.kid); }
+  const jwk = await findKey(header.kid, { fetchKeys, now, cache });
   if (!jwk) throw new Error("unknown kid");
   const key = await crypto.subtle.importKey("jwk", jwk, { name: "RSASSA-PKCS1-v1_5", hash: "SHA-256" }, false, ["verify"]);
   const ok = await crypto.subtle.verify("RSASSA-PKCS1-v1_5", key, b64(s), new TextEncoder().encode(`${h}.${p}`));
@@ -41,18 +57,23 @@ async function verifyToken(token, env, { fetchKeys, now, cache }) {
 export class FetchError extends Error {
   constructor(status) { super(`fetch failed: ${status}`); this.status = status; }
 }
+// A redirect led somewhere checkTarget refuses.
+export class BadTarget extends Error {}
 
 function checkTarget(raw) {
   let u;
   try { u = new URL(raw); } catch { return null; }
   if (!/^https?:$/.test(u.protocol)) return null;
   const host = u.hostname.toLowerCase();
+  if (u.port !== "" && u.port !== "80" && u.port !== "443") return null; // URL drops a default port
   // IPv6 literals keep their brackets in hostname; IPv4 literals are digits and dots.
   if (host === "localhost" || host.endsWith(".localhost") || host.startsWith("[") || /^[\d.]+$/.test(host)) return null;
   return u;
 }
 
+// Reads at most MAX_BYTES of the body; the rest is dropped.
 async function readCapped(res) {
+  if (!res.body) return new Uint8Array(0);
   const reader = res.body.getReader();
   const chunks = []; let n = 0;
   while (n < MAX_BYTES) {
@@ -64,22 +85,47 @@ async function readCapped(res) {
   const all = new Uint8Array(Math.min(n, MAX_BYTES));
   let o = 0;
   for (const c of chunks) { const part = c.subarray(0, all.length - o); all.set(part, o); o += part.length; }
-  return new TextDecoder().decode(all);
+  return all;
 }
 
-// Returns { html, finalUrl }; throws FetchError(status) when the shop does not hand over HTML.
-async function defaultFetchPage(url) {
-  let res;
-  try {
-    res = await fetch(url, {
-      redirect: "follow",
-      signal: AbortSignal.timeout(10_000),
-      headers: { "User-Agent": UA, "Accept-Language": "pl,en", Accept: "text/html,application/xhtml+xml" },
-    });
-  } catch { throw new FetchError(0); }
-  if (!res.ok || !/html/i.test(res.headers.get("content-type") ?? "")) throw new FetchError(res.status);
-  return { html: await readCapped(res), finalUrl: res.url || url };
+// Decodes with the charset the Content-Type names; unknown labels fall back to utf-8.
+function decode(bytes, contentType) {
+  const label = /charset\s*=\s*["']?([^;"'\s]+)/i.exec(contentType)?.[1] ?? "utf-8";
+  try { return new TextDecoder(label).decode(bytes); }
+  catch (e) { if (!(e instanceof RangeError)) throw e; return new TextDecoder().decode(bytes); }
 }
+
+// Returns a fetchPage: { html, finalUrl }. Throws FetchError(status) when the shop does not hand over HTML,
+// BadTarget when a redirect leads somewhere checkTarget refuses. Redirects are followed by hand so every hop is checked.
+export function createFetchPage(fetchImpl = fetch) {
+  return async (startUrl) => {
+    const signal = AbortSignal.timeout(TIMEOUT_MS);
+    let url = startUrl;
+    for (let hop = 0; hop <= MAX_HOPS; hop++) {
+      let res;
+      try {
+        res = await fetchImpl(url, {
+          redirect: "manual", signal,
+          headers: { "User-Agent": UA, "Accept-Language": "pl,en", Accept: "text/html,application/xhtml+xml" },
+        });
+      } catch { throw new FetchError(0); }
+      const loc = [301, 302, 303, 307, 308].includes(res.status) ? res.headers.get("Location") : null;
+      if (loc) {
+        res.body?.cancel().catch(() => {});
+        let next = null;
+        try { next = checkTarget(new URL(loc, url).href); } catch { /* unparsable Location */ }
+        if (!next) throw new BadTarget(loc);
+        url = next.href;
+        continue;
+      }
+      const type = res.headers.get("content-type") ?? "";
+      if (!res.ok || !/html/i.test(type)) throw new FetchError(res.status);
+      return { html: decode(await readCapped(res), type), finalUrl: url };
+    }
+    throw new FetchError(0); // more than MAX_HOPS redirects
+  };
+}
+const defaultFetchPage = createFetchPage();
 
 const VOID = /^(meta|link|input|base|img|br|hr|source)$/i;
 
@@ -136,7 +182,7 @@ export function extractFromHtml(html, finalUrl, { full = false } = {}) {
 }
 
 export function createHandler({ fetchKeys, now, fetchPage }) {
-  const cache = { keys: null }; // per isolate; ponytail: refetched only on a kid miss, no max-age handling
+  const cache = { keys: null, expires: 0, fetchedAt: -Infinity }; // per isolate
   return async (req, env) => {
     const origin = req.headers.get("Origin");
     const allowed = (env.ALLOWED_ORIGINS ?? "").split(",").map((s) => s.trim());
@@ -171,6 +217,7 @@ export function createHandler({ fetchKeys, now, fetchPage }) {
       const { html, finalUrl } = await fetchPage(target.href);
       return reply(200, extractFromHtml(html, finalUrl ?? target.href));
     } catch (e) {
+      if (e instanceof BadTarget) return reply(400, { error: "bad_url" });
       return reply(502, { error: "fetch_failed", status: e instanceof FetchError ? e.status : 0 });
     }
   };

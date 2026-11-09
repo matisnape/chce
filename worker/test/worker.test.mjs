@@ -27,8 +27,8 @@ async function token({ key = pair.privateKey, header = {}, claims = {} } = {}) {
 }
 
 const page = (html, finalUrl = SHOP) => async () => ({ html, finalUrl });
-const handler = (fetchPage = page("<title>x</title>")) =>
-  createHandler({ fetchKeys: async () => [jwk], now: () => NOW, fetchPage });
+const handler = (fetchPage = page("<title>x</title>"), { fetchKeys = async () => ({ keys: [jwk], maxAge: 3600 }), now = () => NOW } = {}) =>
+  createHandler({ fetchKeys, now, fetchPage });
 const post = (h, tok, body = { url: SHOP }, headers = {}) =>
   h(new Request("https://w.test/extract", {
     method: "POST",
@@ -155,4 +155,33 @@ test("slimming keeps at most 60 img tags and drops a cut-off JSON-LD block", () 
   assert.equal(slimHtml(`<head></head><body>${imgs}</body>`).match(/<img/g).length, 60);
   const huge = `<script type="application/ld+json">{"x":"${"a".repeat(70_000)}"}</script>`;
   assert.ok(slimHtml(`<head></head><body>${huge}<img src="/z.jpg"></body>`).length < 1_000);
+});
+
+// --- JWK cache: refetch on an unknown kid at most once a minute, and when max-age runs out ---
+
+test("an unknown kid refetches the keys at most once per 60 s", async () => {
+  let calls = 0, clock = NOW;
+  const fetchKeys = async () => { calls++; return { keys: [jwk], maxAge: 3600 }; };
+  const h = handler(undefined, { fetchKeys, now: () => clock });
+  const bad = await token({ header: { kid: "nope" } });
+  assert.equal((await post(h, bad)).status, 401);
+  assert.equal((await post(h, bad)).status, 401);
+  assert.equal(calls, 1);
+  clock += 61_000;
+  assert.equal((await post(h, bad)).status, 401);
+  assert.equal(calls, 2);
+});
+
+test("keys are refetched once max-age has passed, not before", async () => {
+  let calls = 0, clock = NOW;
+  const fetchKeys = async () => { calls++; return { keys: [jwk], maxAge: 100 }; };
+  const h = handler(undefined, { fetchKeys, now: () => clock });
+  const tok = await token();
+  assert.equal((await post(h, tok)).status, 200);
+  clock += 99_000;
+  assert.equal((await post(h, tok)).status, 200);
+  assert.equal(calls, 1);
+  clock += 2_000;
+  assert.equal((await post(h, tok)).status, 200);
+  assert.equal(calls, 2);
 });
