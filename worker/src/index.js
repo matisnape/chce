@@ -81,9 +81,43 @@ async function defaultFetchPage(url) {
   return { html: await readCapped(res), finalUrl: res.url || url };
 }
 
+const VOID = /^(meta|link|input|base|img|br|hr|source)$/i;
+
+// Cheap string work that keeps only what js/extract.js reads, so linkedom parses a few KB instead of the page.
+// Free-plan CPU is 10 ms per request; a full linkedom parse costs 15-270 ms.
+// ponytail: regex scan, not a parser; odd markup (a ">" inside an attribute) may lose an element.
+export function slimHtml(html) {
+  const hm = /<head[\s>][\s\S]*?<\/head>/i.exec(html);
+  let head, rest;
+  if (hm) { head = hm[0]; rest = html.slice(0, hm.index) + html.slice(hm.index + head.length); }
+  else {
+    const b = html.search(/<body[\s>]/i);
+    head = `<head>${html.slice(0, b < 0 ? 100_000 : Math.min(b, 100_000))}</head>`; rest = html;
+  }
+  // Inline CSS/JS in the head is bulk; only JSON-LD scripts and metadata matter.
+  head = head.replace(/<style[\s\S]*?<\/style>|<!--[\s\S]*?-->|<script\b(?![^>]*ld\+json)[\s\S]*?<\/script>/gi, "").slice(0, 100_000);
+  if (!/<base\b/i.test(head)) head = head.replace(/<head(?:\s[^>]*)?>/i, (h) => h + (/<base\b[^>]*>/i.exec(rest)?.[0] ?? ""));
+
+  const take = (re, n, each) => { const out = []; for (let m; out.length < n && (m = re.exec(rest)); ) each(m, out); return out; };
+  const ld = take(/<script\b[^>]*type\s*=\s*["']?application\/ld\+json[^>]*>[\s\S]*?<\/script>/gi, 20,
+    (m, out) => { if (m[0].length <= 65_536) out.push(m[0]); }); // a cut-off block would swallow what follows
+  const props = take(/<([a-z][a-z0-9]*)\b[^>]*\bitemprop\s*=\s*["']?(?:price|priceCurrency)(?=["'\s>])[^>]*>/gi, 40, (m, out) => {
+    let s = m[0];
+    if (!VOID.test(m[1])) {
+      const tail = rest.slice(m.index + s.length, m.index + s.length + 500);
+      const end = tail.toLowerCase().indexOf(`</${m[1].toLowerCase()}>`);
+      s += (end < 0 ? "" : tail.slice(0, end)) + `</${m[1]}>`;
+    }
+    out.push(s);
+  });
+  const imgs = take(/<img\b[^>]*>/gi, 60, (m, out) => out.push(m[0]));
+  return `<!doctype html><html>${head}<body>${props.join("")}${ld.join("")}${imgs.join("")}</body></html>`;
+}
+
 // Gives extract() the few browser fields it reads, on top of the linkedom document.
-export function extractFromHtml(html, finalUrl) {
-  const { document } = parseHTML(html);
+// `full: true` parses the whole page (tests compare it with the slimmed path).
+export function extractFromHtml(html, finalUrl, { full = false } = {}) {
+  const { document } = parseHTML(full ? html : slimHtml(html));
   const baseHref = document.querySelector("base[href]")?.getAttribute("href");
   let base = finalUrl;
   try { if (baseHref) base = new URL(baseHref, finalUrl).href; } catch { /* keep the final url */ }

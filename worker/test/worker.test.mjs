@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { createHandler, FetchError } from "../src/index.js";
+import { createHandler, FetchError, extractFromHtml, slimHtml } from "../src/index.js";
 
 const ENV = {
   OWNER_UID: "owner-uid",
@@ -120,4 +120,39 @@ test("errors to a disallowed origin carry no allow header", async () => {
   const res = await post(handler(), null, { url: SHOP }, { Origin: "https://evil.example" });
   assert.equal(res.status, 401);
   assert.equal(res.headers.get("Access-Control-Allow-Origin"), null);
+});
+
+// --- slimming: the Free plan gives 10 ms CPU, so only what extract() reads reaches linkedom ---
+
+const PRODUCT_PAGE = `<html><head><title>Fallback</title><style>body{color:red}</style><script>var big = 1;</script>
+  <meta property="og:image" content="/img/og.jpg">
+  <script type="application/ld+json">{"@type":"Product","name":"Lamp","offers":{"price":"49.90","priceCurrency":"PLN"}}</script>
+  </head><body><img src="/img/big.jpg" width="400" height="300"><img src="/tiny.gif" width="10" height="10"></body></html>`;
+const ITEMPROP_PAGE = `<html><head><title>Shoe</title><base href="https://cdn.example/s/"></head><body>
+  <span class="p" itemprop="price">19<small>,99</small></span><meta itemprop="priceCurrency" content="EUR">
+  <span itemprop="priceValidUntil">2030</span><img src="a.jpg" width="300" height="300"></body></html>`;
+
+test("slimmed and full parse give the same result on the fixtures", () => {
+  for (const html of [PRODUCT_PAGE, ITEMPROP_PAGE]) {
+    const url = "https://shop.example/final/p";
+    assert.deepEqual(extractFromHtml(html, url), extractFromHtml(html, url, { full: true }));
+  }
+  assert.equal(extractFromHtml(ITEMPROP_PAGE, SHOP).price, "19,99");
+  assert.equal(extractFromHtml(ITEMPROP_PAGE, SHOP).currency, "EUR");
+});
+
+test("a 1.5 MB page slims under 100 KB and still gives the full-parse result", () => {
+  const filler = '<div class="row"><p>Lorem ipsum dolor sit amet, consectetur adipiscing elit.</p><a href="/x">link</a></div>\n'.repeat(16_000);
+  const html = PRODUCT_PAGE.replace("<body>", `<body>${filler}`).replace("</body>", `${filler}</body>`);
+  assert.ok(html.length > 1_500_000, `fixture is ${html.length} bytes`);
+  const slim = slimHtml(html);
+  assert.ok(slim.length < 100_000, `slimmed is ${slim.length} bytes`);
+  assert.deepEqual(extractFromHtml(html, SHOP), extractFromHtml(html, SHOP, { full: true }));
+});
+
+test("slimming keeps at most 60 img tags and drops a cut-off JSON-LD block", () => {
+  const imgs = '<img src="/i.jpg" width="200" height="200">'.repeat(100);
+  assert.equal(slimHtml(`<head></head><body>${imgs}</body>`).match(/<img/g).length, 60);
+  const huge = `<script type="application/ld+json">{"x":"${"a".repeat(70_000)}"}</script>`;
+  assert.ok(slimHtml(`<head></head><body>${huge}<img src="/z.jpg"></body>`).length < 1_000);
 });
