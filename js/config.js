@@ -16,3 +16,7 @@ export const GUEST_EMAIL = "guest@anks.pl";
 export const LIST_ID = "main";
 
 export const SDK = "https://www.gstatic.com/firebasejs/13.1.0";
+
+// Tests run against the Firebase emulators: only on localhost, only with ?emulator in the URL.
+export const EMULATOR = typeof location !== "undefined" &&
+  ["localhost", "127.0.0.1"].includes(location.hostname) && new URLSearchParams(location.search).has("emulator");

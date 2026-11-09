@@ -1,13 +1,19 @@
-import { firebaseConfig, GUEST_EMAIL, LIST_ID, OWNER_UID, SDK } from "./config.js";
+import { firebaseConfig, GUEST_EMAIL, LIST_ID, OWNER_UID, SDK, EMULATOR } from "./config.js";
 import { parsePrice, formatPrice, safeUrl } from "./util.js";
 
 const { initializeApp } = await import(`${SDK}/firebase-app.js`);
-const { getAuth, onAuthStateChanged, signInWithEmailAndPassword, signInWithPopup, GoogleAuthProvider, signOut } = await import(`${SDK}/firebase-auth.js`);
-const { getFirestore, doc, getDoc, collection, getDocs, query, orderBy, addDoc, updateDoc, deleteDoc, setDoc, serverTimestamp } = await import(`${SDK}/firebase-firestore.js`);
+const { getAuth, connectAuthEmulator, onAuthStateChanged, signInWithEmailAndPassword, signInWithPopup, GoogleAuthProvider, signOut } = await import(`${SDK}/firebase-auth.js`);
+const { getFirestore, connectFirestoreEmulator, doc, getDoc, collection, getDocs, query, orderBy, addDoc, updateDoc, deleteDoc, setDoc, serverTimestamp } = await import(`${SDK}/firebase-firestore.js`);
 
-const app = initializeApp(firebaseConfig);
+const app = initializeApp(EMULATOR ? { ...firebaseConfig, projectId: "demo-chce" } : firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
+if (EMULATOR) {
+  connectAuthEmulator(auth, "http://127.0.0.1:9099", { disableWarnings: true });
+  connectFirestoreEmulator(db, "127.0.0.1", 8085);
+  // The Google popup cannot run headless; rules check only the UID, so tests sign the owner in by password.
+  window.__signInOwner = (email, password) => signInWithEmailAndPassword(auth, email, password);
+}
 const listRef = doc(db, "lists", LIST_ID);
 const tabsCol = collection(listRef, "tabs");
 const itemsCol = collection(listRef, "items");
