@@ -19,6 +19,7 @@ h1 { margin: 0 0 12px; }
 #gate { max-width: 320px; margin: 15vh auto; display: grid; gap: 8px; }
 input, button { font: inherit; padding: 8px 10px; border-radius: 6px; border: 1px solid var(--line); background: var(--card); color: var(--fg); }
 button { background: var(--accent); color: #fff; border: 0; cursor: pointer; }
+button.link { background: none; color: var(--muted); text-decoration: underline; padding: 4px 0; font-size: .85rem; }
 .error { color: var(--accent); margin: 0; }
 
 #tabs { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 12px; }

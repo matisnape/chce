@@ -1,7 +1,7 @@
 import { firebaseConfig, GUEST_EMAIL, LIST_ID, SDK } from "./config.js";
 
 const { initializeApp } = await import(`${SDK}/firebase-app.js`);
-const { getAuth, onAuthStateChanged, signInWithEmailAndPassword } = await import(`${SDK}/firebase-auth.js`);
+const { getAuth, onAuthStateChanged, signInWithEmailAndPassword, signInWithPopup, GoogleAuthProvider } = await import(`${SDK}/firebase-auth.js`);
 const { getFirestore, doc, getDoc, collection, getDocs, query, orderBy } = await import(`${SDK}/firebase-firestore.js`);
 
 const app = initializeApp(firebaseConfig);
@@ -27,6 +27,12 @@ $("gate").addEventListener("submit", async (e) => {
     show("gate-error");
   }
 });
+
+// Popup, not redirect: redirect breaks when authDomain differs from anks.pl and third-party storage is blocked.
+$("owner-login").addEventListener("click", () => signInWithPopup(auth, new GoogleAuthProvider()).catch((e) => {
+  $("gate-error").textContent = `Logowanie nieudane: ${e.code ?? e.message}`;
+  show("gate-error");
+}));
 
 let tabs = [];
 let items = [];
