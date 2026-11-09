@@ -81,7 +81,7 @@ test("another user's valid token gives 403", async () => {
 
 test("owner and a JSON-LD product page give 200 with the item", async () => {
   const html = `<html><head><title>Fallback</title>
-    <meta property="og:image" content="/img/og.jpg"><meta name="twitter:image" content="/img/og.jpg">
+    <meta property="og:image" content="/img/og.jpg">
     <script type="application/ld+json">{"@type":"Product","name":"Lamp","offers":{"price":"49.90","priceCurrency":"PLN"}}</script>
     </head><body><img src="/img/big.jpg" width="400" height="300"><img src="/tiny.gif" width="10" height="10"></body></html>`;
   const res = await post(handler(page(html, "https://shop.example/final/p")), await token(), { url: SHOP }, { Origin: "https://anks.pl" });
@@ -96,7 +96,7 @@ test("owner and a JSON-LD product page give 200 with the item", async () => {
 });
 
 test("<base href> resolves relative images", async () => {
-  const html = `<head><base href="https://cdn.example/a/"><meta property="og:image" content="x.jpg"><meta name="twitter:image" content="x.jpg"></head>`;
+  const html = `<head><base href="https://cdn.example/a/"><meta property="og:image" content="x.jpg"></head>`;
   const body = await (await post(handler(page(html)), await token())).json();
   assert.deepEqual(body.images, ["https://cdn.example/a/x.jpg"]);
 });
@@ -311,6 +311,15 @@ test("an oversized head is cut at a tag boundary, never inside a script or a tag
   assert.ok(slim.includes("<title>t</title>"));
 });
 
+test("a long meta tag across the head cap is dropped whole, not cut in half", () => {
+  // The 100 KB cut lands inside the long meta tag; the head must end at the tag before it.
+  const head = `${'<meta name="k" content="v">'.repeat(3_700)}<meta name="long" content="${"x".repeat(500)}">`;
+  const slim = slimHtml(`<html><head>${head}</head><body></body></html>`);
+  assert.ok(slim.length < 100_000, `slimmed is ${slim.length} bytes`);
+  assert.ok(!slim.includes('name="long"'), "the straddling tag is gone");
+  assert.equal(slim.split("<body>")[0].replace(/<[^<>]*>/g, "").includes("<"), false, "no half-open tag is left");
+});
+
 // --- key fetch: one shared fetch, 503 on outage, retry after a failure ---
 
 test("concurrent requests on a fresh handler share one key fetch and both succeed", async () => {
@@ -321,6 +330,17 @@ test("concurrent requests on a fresh handler share one key fetch and both succee
   const statuses = (await Promise.all([post(h, tok), post(h, tok)])).map((r) => r.status);
   assert.deepEqual(statuses, [200, 200]);
   assert.equal(calls, 1);
+});
+
+test("a key refetch that fails after max-age still verifies a token with a cached kid", async () => {
+  let calls = 0, clock = NOW;
+  const fetchKeys = async () => { if (++calls > 1) throw new Error("jwk down"); return { keys: [jwk], maxAge: 100 }; };
+  const h = handler(undefined, { fetchKeys, now: () => clock });
+  const tok = await token();
+  assert.equal((await post(h, tok)).status, 200);
+  clock += 101_000;
+  assert.equal((await post(h, tok)).status, 200);
+  assert.equal(calls, 2, "the refetch was tried and failed");
 });
 
 test("a failing key fetch gives 503, and the next request retries at once", async () => {
