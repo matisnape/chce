@@ -58,26 +58,47 @@ async function fillForm() {
   fillFields(page);
 }
 
-// Fills the form from page data (hash or Worker). Rule: only empty fields are filled, so what the
-// owner already typed is never overwritten. Currency follows the price, images only come in when
-// none is offered yet and no custom image URL is typed.
-function fillFields(d) {
+// What the last fetch put into each field. A field is overwritten only while it is empty or still
+// holds that value, so a hand edit is never lost and a corrected link can replace the first result.
+const last = { title: "", price: "", currency: "", images: [] };
+
+// Fills the form from page data (hash or Worker) and says whether anything changed. `track` (the
+// Worker path) records what it wrote; the hash fill is not tracked, so a fetch never replaces it.
+// Currency follows the price. Images come in when none is offered or the offered ones are the last
+// fetch's with the first still picked, and no custom image URL is typed.
+function fillFields(d, track = false) {
   const f = form.elements;
-  const priceWasEmpty = !f.price.value.trim();
-  if (!f.title.value.trim()) f.title.value = d.title;
-  if (!f.url.value.trim()) f.url.value = safeUrl(d.url) ?? "";
-  const price = parsePrice(d.price);
-  if (priceWasEmpty) f.price.value = price ?? "";
-  if (priceWasEmpty && /^[A-Za-z]{3}$/.test(d.currency)) f.currency.value = d.currency.toUpperCase();
+  let changed = false;
+  const set = (el, val) => { if (el.value !== val) changed = true; el.value = val; };
+  const free = (el, prev, ...also) => { const v = el.value.trim(); return !v || also.includes(v) || (track && v === prev); };
+
+  if (free(f.title, last.title)) { set(f.title, d.title); if (track) last.title = f.title.value; }
+  if (!f.url.value.trim()) set(f.url, safeUrl(d.url) ?? "");
+  const priceFree = free(f.price, last.price);
+  if (priceFree) {
+    set(f.price, parsePrice(d.price) ?? "");
+    if (track) last.price = f.price.value;
+    if (/^[A-Za-z]{3}$/.test(d.currency) && free(f.currency, last.currency, f.currency.defaultValue)) {
+      set(f.currency, d.currency.toUpperCase());
+      if (track) last.currency = f.currency.value;
+    }
+  }
   show("saved", false);
 
-  const noImages = ![...$("images").querySelectorAll('input[name="image"]')].some((r) => r.value) && !f.customImage.value.trim();
-  if (noImages) {
+  const radios = [...$("images").querySelectorAll('input[name="image"]')];
+  const shown = radios.map((r) => r.value).filter(Boolean);
+  const picked = radios.find((r) => r.checked)?.value ?? "";
+  const imagesFree = !f.customImage.value.trim() &&
+    (!shown.length || (track && shown.join("\n") === last.images.join("\n") && picked === (last.images[0] ?? "")));
+  if (imagesFree) {
+    if (shown.join("\n") !== d.images.join("\n")) changed = true;
     const choices = d.images.map((src, i) => imageChoice(src, i === 0));
     choices.push(imageChoice(null, d.images.length === 0));
     $("images").replaceChildren(...choices);
+    if (track) last.images = d.images;
   }
   show("add-form");
+  return changed;
 }
 
 function imageChoice(src, checked) {
@@ -92,8 +113,14 @@ function imageChoice(src, checked) {
   return label;
 }
 
+const saveBtn = form.querySelector('button[type="submit"]');
+let running = null; // AbortController of the fetch in flight, if any
+
 form.addEventListener("submit", async (e) => {
   e.preventDefault();
+  if (saveBtn.disabled) return;
+  saveBtn.disabled = true; // one save at a time; re-enabled only when it fails
+  running?.abort("saving"); // a late Worker reply must not refill the form after the save
   show("add-error", false);
   const v = (name) => form.elements[name].value.trim();
   const tabId = v("tabId");
@@ -118,6 +145,7 @@ form.addEventListener("submit", async (e) => {
   } catch (err) {
     $("add-error").textContent = `Nie udało się zapisać: ${err.code ?? err.message}`;
     show("add-error");
+    saveBtn.disabled = false;
   }
 });
 
@@ -147,7 +175,8 @@ fetchBtn.addEventListener("click", async () => {
   fetchBtn.disabled = true;
   note("Pobieram dane…");
   const ctl = new AbortController();
-  const timer = setTimeout(() => ctl.abort(), FETCH_TIMEOUT_MS);
+  running = ctl;
+  const timer = setTimeout(() => ctl.abort("timeout"), FETCH_TIMEOUT_MS);
   try {
     const token = await auth.currentUser.getIdToken();
     const res = await fetch(WORKER_URL + "/extract", {
@@ -156,16 +185,20 @@ fetchBtn.addEventListener("click", async () => {
       body: JSON.stringify({ url: link }),
       signal: ctl.signal,
     });
+    ctl.signal.throwIfAborted();
     if (!res.ok) { note(WORKER_ERRORS[res.status] ?? `Nie udało się pobrać danych (błąd ${res.status}). Wpisz dane ręcznie.`, true); return; }
     const got = clean(await res.json());
+    ctl.signal.throwIfAborted();
     if (!got.title && !got.price && !got.images.length) { note("Nic nie znaleziono na tej stronie. Wpisz dane ręcznie.", true); return; }
-    fillFields(got);
-    note("Dane pobrane. Uzupełniono tylko puste pola; sprawdź i zapisz.");
+    note(fillFields(got, true) ? "Dane pobrane. Uzupełniono tylko pola bez ręcznych zmian; sprawdź i zapisz."
+      : "Pola są już wypełnione, nic nie zmieniono.");
   } catch (e) {
+    if (ctl.signal.reason === "saving") { note(""); return; }
     note(ctl.signal.aborted ? "Pobieranie trwa za długo. Spróbuj jeszcze raz albo wpisz dane ręcznie."
       : "Brak połączenia z usługą pobierania. Wpisz dane ręcznie.", true);
   } finally {
     clearTimeout(timer);
+    if (running === ctl) running = null;
     fetchBtn.disabled = false;
   }
 });
