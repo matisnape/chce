@@ -165,6 +165,13 @@ test("a Product nested in an ItemList does not beat the page's own Product", asy
   await expect(popup.locator('[name="currency"]')).toHaveValue("EUR");
 });
 
+test("a Product nested as WebPage.mainEntity beats an earlier related Product", async ({ page }) => {
+  const popup = await runBookmarklet(page, "mainentity");
+  await expect(popup.locator('[name="title"]')).toHaveValue("Main");
+  await expect(popup.locator('[name="price"]')).toHaveValue("300");
+  await expect(popup.locator('[name="currency"]')).toHaveValue("PLN");
+});
+
 test("a JSON-LD name that is an object falls through to the page title", async ({ page }) => {
   const popup = await runBookmarklet(page, "object-name");
   await expect(popup.locator('[name="title"]')).toHaveValue("Shelf Pine - Fake Shop");
