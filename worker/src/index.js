@@ -193,6 +193,8 @@ export function extractFromHtml(html, finalUrl, { full = false } = {}) {
     src: img.getAttribute("src") ?? "",
     naturalWidth: 0, naturalHeight: 0, // no layout on the server: declared size only
     width: dim(img, "width"), height: dim(img, "height"),
+    getBoundingClientRect: () => ({ width: 0, height: 0 }), // no layout either
+    getAttribute: (n) => img.getAttribute(n), // data-src of lazy images
   }));
   const over = { location: { href: finalUrl }, baseURI: base, images, title: document.title };
   const doc = new Proxy(document, {
