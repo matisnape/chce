@@ -187,7 +187,7 @@ const withHash = async (page, data, raw) => {
 
 test("hash caps: long title cut, javascript: image dropped, description ignored", async ({ page }) => {
   await withHash(page, {
-    title: "x".repeat(10000), url: "https://shop.example/p", price: "1".repeat(100), currency: "PLNXX",
+    title: "x".repeat(10000), url: "https://shop.example/p", price: "0".repeat(30) + "12345", currency: "USDXX",
     description: "from the hash",
     images: ["javascript:alert(1)", "https://shop.example/" + "a".repeat(3000), "https://shop.example/ok.jpg"],
   });
@@ -196,7 +196,8 @@ test("hash caps: long title cut, javascript: image dropped, description ignored"
   await expect(page.locator('[name="description"]')).toHaveValue("");
   await expect(page.locator("#images img")).toHaveCount(1);
   await expect(page.locator("#images img")).toHaveAttribute("src", "https://shop.example/ok.jpg");
-  expect((await page.locator('[name="price"]').inputValue()).length).toBeLessThanOrEqual(32);
+  await expect(page.locator('[name="price"]')).toHaveValue("12");
+  await expect(page.locator('[name="currency"]')).toHaveValue("USD");
 });
 
 test("a malformed hash gives an empty form, not a crash", async ({ page }) => {
