@@ -13,6 +13,7 @@ if (EMULATOR) {
   fbStore.connectFirestoreEmulator(db, "127.0.0.1", 8085);
   // The Google popup cannot run headless; rules check only the UID, so tests sign the owner in by password.
   window.__signInOwner = (email, password) => fbAuth.signInWithEmailAndPassword(auth, email, password);
+  window.__signOut = () => fbAuth.signOut(auth);
 }
 
 export const listRef = fbStore.doc(db, "lists", LIST_ID);

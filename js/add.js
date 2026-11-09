@@ -21,16 +21,9 @@ fbAuth.onAuthStateChanged(auth, async (user) => {
   const owner = user?.uid === OWNER_UID;
   show("signin", !owner);
   if (!owner) { show("add-form", false); return; }
-  if (filled) return;
+  if (filled) { show("add-form"); return; }
   filled = true;
   try { await fillForm(); } catch (e) { fail(`Nie udało się wczytać formularza: ${e.code ?? e.message}`); }
-});
-
-// A second bookmarklet click reaches an open popup as a hash change: refill from the new data.
-addEventListener("hashchange", () => {
-  page = readHash();
-  if (!filled) return;
-  try { fillFields(); } catch (e) { fail(`Nie udało się wczytać danych: ${e.code ?? e.message}`); }
 });
 
 $("owner-login").addEventListener("click", () => signInOwnerWithGoogle().catch((e) => {

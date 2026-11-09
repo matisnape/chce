@@ -2,7 +2,8 @@
 import { test, expect } from "@playwright/test";
 import { reset, seedList, listIds, OWNER } from "./emulator.js";
 
-const FIXTURE = "http://127.0.0.1:4173/tests/fixtures";
+// Another origin than the app (see playwright.config.js), like a real shop.
+const FIXTURE = "http://localhost:4174/tests/fixtures";
 
 test.beforeEach(async () => {
   await reset();
@@ -102,6 +103,29 @@ test("a second click with the popup still open shows the second product", async 
   await expect(second.locator('[name="title"]')).toHaveValue("Scarf Fjord");
 });
 
+test("owner, signed out, owner again: the filled popup shows its form again", async ({ page }) => {
+  const popup = await runBookmarklet(page, "price-meta");
+  await expect(popup.locator('[name="title"]')).toHaveValue("Mug Basalt");
+  await popup.evaluate(() => window.__signOut());
+  await expect(popup.locator("#owner-login")).toBeVisible();
+  await expect(form(popup)).toBeHidden();
+  await popup.evaluate(({ email, password }) => window.__signInOwner(email, password), OWNER);
+  await expect(form(popup)).toBeVisible();
+  await expect(popup.locator('[name="title"]')).toHaveValue("Mug Basalt");
+});
+
+test("a shop page that pre-opened a window named chce does not receive the popup", async ({ page }) => {
+  const code = await bookmarkletCode(page);
+  await signInOwner(page);
+  await page.goto(`${FIXTURE}/price-meta.html`);
+  const [squat] = await Promise.all([page.waitForEvent("popup"), page.evaluate(() => { window.open("about:blank", "chce"); })]);
+  const [popup] = await Promise.all([page.waitForEvent("popup"), page.evaluate(code)]);
+  expect(popup).not.toBe(squat);
+  await expect(form(popup)).toBeVisible();
+  expect(squat.url()).toBe("about:blank");
+  expect(await popup.evaluate(() => window.opener)).toBeNull();
+});
+
 test("the popup is opened with noopener: window.opener is null", async ({ page }) => {
   const popup = await runBookmarklet(page, "price-meta");
   await expect(form(popup)).toBeVisible();
@@ -166,14 +190,6 @@ test("a malformed hash gives an empty form, not a crash", async ({ page }) => {
   await withHash(page, null, "%E0%A4%A");
   await expect(form(page)).toBeVisible();
   await expect(page.locator('[name="title"]')).toHaveValue("");
-});
-
-test("a hash change in the open popup refills the fields", async ({ page }) => {
-  await withHash(page, { title: "First", url: "https://shop.example/1" });
-  await expect(page.locator('[name="title"]')).toHaveValue("First");
-  await page.evaluate((h) => { location.hash = h; }, encodeURIComponent(JSON.stringify({ title: "Second", url: "https://shop.example/2" })));
-  await expect(page.locator('[name="title"]')).toHaveValue("Second");
-  await expect(page.locator('[name="url"]')).toHaveValue("https://shop.example/2");
 });
 
 test("JSON-LD that is not valid JSON does not break extraction", async ({ page }) => {
