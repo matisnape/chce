@@ -20,15 +20,20 @@ async function defaultFetchKeys() {
   return { keys: (await r.json()).keys, maxAge };
 }
 
-// Cached key for `kid`; refetches when the kid is unknown or max-age ran out, but never twice within REFETCH_MS.
+// The key set could not be loaded and no cached key matches: the owner should retry, not re-login.
+export class KeysUnavailable extends Error {}
+
+// Cached key for `kid`; refetches when the kid is unknown or max-age ran out, but not within REFETCH_MS of the
+// last successful fetch. Concurrent callers share one in-flight fetch; a failed fetch starts no throttle window.
 async function findKey(kid, { fetchKeys, now, cache }) {
   const t = now();
   let jwk = cache.keys?.find((k) => k.kid === kid);
-  if ((!jwk || t >= cache.expires) && t - cache.fetchedAt >= REFETCH_MS) {
-    cache.fetchedAt = t; // set before the await so a failing or slow fetch is throttled too
-    const { keys, maxAge } = await fetchKeys();
-    cache.keys = keys; cache.expires = t + maxAge * 1000;
-    jwk = keys.find((k) => k.kid === kid);
+  if ((!jwk || t >= cache.expires) && (cache.inflight || t - cache.fetchedAt >= REFETCH_MS)) {
+    cache.inflight ??= fetchKeys().then(({ keys, maxAge }) => {
+      cache.keys = keys; cache.expires = t + maxAge * 1000; cache.fetchedAt = t;
+    }).finally(() => { cache.inflight = null; });
+    try { await cache.inflight; } catch { if (!jwk) throw new KeysUnavailable(); } // a stale cached key still beats an outage
+    jwk = cache.keys?.find((k) => k.kid === kid);
   }
   return jwk;
 }
@@ -197,7 +202,7 @@ export function extractFromHtml(html, finalUrl, { full = false } = {}) {
 }
 
 export function createHandler({ fetchKeys, now, fetchPage }) {
-  const cache = { keys: null, expires: 0, fetchedAt: -Infinity }; // per isolate
+  const cache = { keys: null, expires: 0, fetchedAt: -Infinity, inflight: null }; // per isolate
   return async (req, env) => {
     const origin = req.headers.get("Origin");
     const allowed = (env.ALLOWED_ORIGINS ?? "").split(",").map((s) => s.trim());
@@ -221,7 +226,9 @@ export function createHandler({ fetchKeys, now, fetchPage }) {
     try {
       if (!m) throw new Error("no token");
       claims = await verifyToken(m[1], env, { fetchKeys, now, cache });
-    } catch { return reply(401, { error: "unauthorized" }); }
+    } catch (e) {
+      return e instanceof KeysUnavailable ? reply(503, { error: "keys_unavailable" }) : reply(401, { error: "unauthorized" });
+    }
     if (claims.sub !== env.OWNER_UID) return reply(403, { error: "forbidden" });
 
     let target;

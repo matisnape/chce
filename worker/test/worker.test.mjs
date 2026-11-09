@@ -298,3 +298,27 @@ test("an oversized head is cut at a tag boundary, never inside a script or a tag
   assert.ok(slim.split("<body>")[0].endsWith(">"), "the head ends at a tag");
   assert.ok(slim.includes("<title>t</title>"));
 });
+
+// --- key fetch: one shared fetch, 503 on outage, retry after a failure ---
+
+test("concurrent requests on a fresh handler share one key fetch and both succeed", async () => {
+  let calls = 0;
+  const fetchKeys = async () => { calls++; await new Promise((ok) => setTimeout(ok, 30)); return { keys: [jwk], maxAge: 3600 }; };
+  const h = handler(undefined, { fetchKeys });
+  const tok = await token();
+  const statuses = (await Promise.all([post(h, tok), post(h, tok)])).map((r) => r.status);
+  assert.deepEqual(statuses, [200, 200]);
+  assert.equal(calls, 1);
+});
+
+test("a failing key fetch gives 503, and the next request retries at once", async () => {
+  let calls = 0;
+  const fetchKeys = async () => { if (++calls === 1) throw new Error("jwk down"); return { keys: [jwk], maxAge: 3600 }; };
+  const h = handler(undefined, { fetchKeys });
+  const tok = await token();
+  const first = await post(h, tok);
+  assert.equal(first.status, 503);
+  assert.deepEqual(await first.json(), { error: "keys_unavailable" });
+  assert.equal((await post(h, tok)).status, 200);
+  assert.equal(calls, 2);
+});
