@@ -56,3 +56,19 @@ textarea, select { font: inherit; padding: 8px 10px; border-radius: 6px; border:
 dialog input { background: var(--bg); }
 .row { display: grid; grid-template-columns: 1fr 90px; gap: 8px; }
 .actions { display: flex; gap: 8px; }
+
+/* Add popup and bookmarklet page */
+main.narrow { max-width: 560px; }
+#add-form, #signin { display: grid; gap: 10px; }
+#add-form label { display: grid; gap: 4px; font-size: .9rem; }
+#add-form input, #add-form textarea, #add-form select { background: var(--card); }
+fieldset { border: 1px solid var(--line); border-radius: 8px; display: grid; gap: 8px; }
+.image-picker { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
+.image-picker label { position: relative; cursor: pointer; }
+.image-picker input { position: absolute; opacity: 0; }
+.image-picker img { width: 100%; aspect-ratio: 1; object-fit: contain; background: #fff; border: 2px solid var(--line); border-radius: 6px; }
+.image-picker input:checked + img { border-color: var(--accent); }
+.image-picker input:focus-visible + img { outline: 2px solid var(--accent); }
+.image-picker .none { display: grid; place-items: center; aspect-ratio: 1; border: 2px dashed var(--line); border-radius: 6px; font-size: .8rem; color: var(--muted); }
+.image-picker input:checked + .none { border-color: var(--accent); }
+a.bookmarklet { display: inline-block; padding: 8px 16px; background: var(--accent); color: #fff; border-radius: 999px; text-decoration: none; font-weight: 600; }

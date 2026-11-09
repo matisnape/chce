@@ -1,22 +1,9 @@
-import { firebaseConfig, GUEST_EMAIL, LIST_ID, OWNER_UID, SDK, EMULATOR } from "./config.js";
-import { parsePrice, formatPrice, safeUrl } from "./util.js";
+import { GUEST_EMAIL, OWNER_UID } from "./config.js";
+import { parsePrice, formatPrice, safeUrl, nextOrder } from "./util.js";
+import { auth, fbAuth, fbStore, listRef, tabsCol, itemsCol, signInOwnerWithGoogle } from "./firebase.js";
 
-const { initializeApp } = await import(`${SDK}/firebase-app.js`);
-const { getAuth, connectAuthEmulator, onAuthStateChanged, signInWithEmailAndPassword, signInWithPopup, GoogleAuthProvider, signOut } = await import(`${SDK}/firebase-auth.js`);
-const { getFirestore, connectFirestoreEmulator, doc, getDoc, collection, getDocs, query, orderBy, addDoc, updateDoc, deleteDoc, setDoc, serverTimestamp } = await import(`${SDK}/firebase-firestore.js`);
-
-const app = initializeApp(EMULATOR ? { ...firebaseConfig, projectId: "demo-chce" } : firebaseConfig);
-const auth = getAuth(app);
-const db = getFirestore(app);
-if (EMULATOR) {
-  connectAuthEmulator(auth, "http://127.0.0.1:9099", { disableWarnings: true });
-  connectFirestoreEmulator(db, "127.0.0.1", 8085);
-  // The Google popup cannot run headless; rules check only the UID, so tests sign the owner in by password.
-  window.__signInOwner = (email, password) => signInWithEmailAndPassword(auth, email, password);
-}
-const listRef = doc(db, "lists", LIST_ID);
-const tabsCol = collection(listRef, "tabs");
-const itemsCol = collection(listRef, "items");
+const { onAuthStateChanged, signInWithEmailAndPassword, signOut } = fbAuth;
+const { doc, getDoc, getDocs, query, orderBy, addDoc, updateDoc, deleteDoc, setDoc, serverTimestamp } = fbStore;
 
 const $ = (id) => document.getElementById(id);
 const show = (id, on = true) => { $(id).hidden = !on; };
@@ -48,9 +35,8 @@ $("gate").addEventListener("submit", async (e) => {
   }
 });
 
-// Popup, not redirect: redirect breaks when authDomain differs from anks.pl and third-party storage is blocked.
 $("owner-login").addEventListener("click", () =>
-  signInWithPopup(auth, new GoogleAuthProvider()).catch((e) => showGateError(`Logowanie nieudane: ${e.code ?? e.message}`)));
+  signInOwnerWithGoogle().catch((e) => showGateError(`Logowanie nieudane: ${e.code ?? e.message}`)));
 
 $("logout").addEventListener("click", () => signOut(auth));
 
@@ -273,9 +259,6 @@ function moveItemToTab(itemId, tabId) {
 
 // ---------- helpers ----------
 
-function nextOrder(list) {
-  return list.reduce((max, x) => Math.max(max, x.order ?? 0), 0) + 1;
-}
 
 function el(tag, attrs = {}, ...children) {
   const node = document.createElement(tag);
