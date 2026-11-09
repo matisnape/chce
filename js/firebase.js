@@ -1,7 +1,7 @@
 // One Firebase setup shared by every page. In emulator mode (tests) it talks to the local emulators.
 import { firebaseConfig, LIST_ID, SDK, EMULATOR } from "./config.js";
 
-export const fbApp = await import(`${SDK}/firebase-app.js`);
+const fbApp = await import(`${SDK}/firebase-app.js`);
 export const fbAuth = await import(`${SDK}/firebase-auth.js`);
 export const fbStore = await import(`${SDK}/firebase-firestore.js`);
 

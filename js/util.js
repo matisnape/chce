@@ -1,7 +1,18 @@
-// Accepts "1 299,99", "1299.99 zł" and the like; empty or unreadable gives null.
+// Accepts "1 299,99", "1.299,00", "1299.99 zł" and the like; empty or unreadable gives null.
+// Both separators present: the last one is the decimal mark. A lone one followed by exactly
+// 3 digits is a thousands separator; otherwise a lone "," is decimal and a lone "." stays decimal.
 export function parsePrice(text) {
-  const cleaned = text.replace(/[^\d,.-]/g, "").replace(/,(?=\d{1,2}$)/, ".").replace(/,/g, "");
-  const n = parseFloat(cleaned);
+  let c = text.replace(/[^\d,.-]/g, "");
+  const dot = c.lastIndexOf("."), comma = c.lastIndexOf(",");
+  if (dot >= 0 && comma >= 0) {
+    const dec = Math.max(dot, comma) === dot ? "." : ",";
+    c = c.split(dec === "." ? "," : ".").join("").replace(dec, ".");
+  } else if (dot >= 0 || comma >= 0) {
+    const sep = dot >= 0 ? "." : ",";
+    const parts = c.split(sep);
+    c = parts.length > 2 || /^\d{3}$/.test(parts[1]) ? parts.join("") : parts.join(".");
+  }
+  const n = parseFloat(c);
   return Number.isFinite(n) ? n : null;
 }
 

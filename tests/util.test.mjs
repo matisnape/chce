@@ -6,6 +6,12 @@ assert.equal(parsePrice("1 299,99 zł"), 1299.99);
 assert.equal(parsePrice("1,299.99"), 1299.99);
 assert.equal(parsePrice("12,5"), 12.5);
 assert.equal(parsePrice("49"), 49);
+assert.equal(parsePrice("1.299,00"), 1299);
+assert.equal(parsePrice("1.299,5"), 1299.5);
+assert.equal(parsePrice("1.299"), 1299);
+assert.equal(parsePrice("1,299"), 1299);
+assert.equal(parsePrice("1.299.000"), 1299000);
+assert.equal(parsePrice("12.5"), 12.5);
 assert.equal(parsePrice(""), null);
 assert.equal(parsePrice("brak"), null);
 
