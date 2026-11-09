@@ -36,8 +36,9 @@ export function extract(doc) {
   const pick = (list) => list.find((p) => p.offers) ?? list[0];
   const products = nodes.filter(isProduct);
   const product = pick(products.filter((p) => !related.has(p))) ?? pick(products);
-  // The product's own offer first (object, array, AggregateOffer); the global search is a fallback.
-  const offer = [].concat(product?.offers ?? []).find(hasPrice) ?? nodes.find(hasPrice);
+  // The product's own offer first (object, array, AggregateOffer); the global search is a fallback
+  // that skips everything under a related-products key, which prices other products.
+  const offer = [].concat(product?.offers ?? []).find(hasPrice) ?? nodes.find((n) => hasPrice(n) && !related.has(n));
   const offerPrice = offer ? offer.price ?? offer.lowPrice : null;
 
   const price = meta("product:price:amount", "og:price:amount", "price")

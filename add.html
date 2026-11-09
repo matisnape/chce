@@ -35,6 +35,8 @@
       </fieldset>
       <label>Opis <textarea name="description" rows="3" maxlength="2000"></textarea></label>
       <label>Link do sklepu <input name="url" type="url" placeholder="https://"></label>
+      <div class="actions"><button id="fetch-link" type="button">Pobierz dane z linku</button></div>
+      <p id="fetch-status" role="status" hidden></p>
       <div class="actions"><button type="submit">Zapisz</button></div>
       <p id="add-error" class="error" hidden></p>
     </form>

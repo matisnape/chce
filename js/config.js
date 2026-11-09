@@ -15,6 +15,9 @@ export const GUEST_EMAIL = "guest@anks.pl";
 // One list for now; the data model keeps room for more.
 export const LIST_ID = "main";
 
+// The Cloudflare Worker that fetches a shop page for the owner (docs/decisions.md 17, 18).
+export const WORKER_URL = "https://chce.anks14.workers.dev";
+
 export const SDK = "https://www.gstatic.com/firebasejs/13.1.0";
 
 // Tests run against the Firebase emulators: only on localhost, only with ?emulator in the URL.

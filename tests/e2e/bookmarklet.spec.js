@@ -158,6 +158,13 @@ test("related-products JSON-LD first: the product's own offer array wins, price 
   await expect(popup.locator('[name="currency"]')).toHaveValue("EUR");
 });
 
+test("a related product's offer is not taken when the page's own Product has no offers", async ({ page }) => {
+  const popup = await runBookmarklet(page, "related-no-offer");
+  await expect(popup.locator('[name="title"]')).toHaveValue("Chair Oak");
+  await expect(popup.locator('[name="price"]')).toHaveValue("");
+  await expect(popup.locator('[name="currency"]')).toHaveValue("PLN");
+});
+
 test("a Product nested in an ItemList does not beat the page's own Product", async ({ page }) => {
   const popup = await runBookmarklet(page, "nested-product");
   await expect(popup.locator('[name="title"]')).toHaveValue("Desk Oak");
