@@ -259,7 +259,6 @@ function moveItemToTab(itemId, tabId) {
 
 // ---------- helpers ----------
 
-
 function el(tag, attrs = {}, ...children) {
   const node = document.createElement(tag);
   for (const [k, v] of Object.entries(attrs)) node.setAttribute(k, v);
