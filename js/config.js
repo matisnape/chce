@@ -7,6 +7,9 @@ export const firebaseConfig = {
 };
 
 // The shared guest account: the guest password is this account's password.
+// UIDs are identifiers, not credentials; firestore.rules holds the same values.
+export const OWNER_UID = "bfKB1t30oIcRYkswE73omAIvpok1";
+
 export const GUEST_EMAIL = "guest@anks.pl";
 
 // One list for now; the data model keeps room for more.

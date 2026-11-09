@@ -26,11 +26,51 @@
       <header>
         <h1 id="list-title">chce</h1>
         <nav id="tabs" aria-label="Zakładki"></nav>
+        <div class="owner-only toolbar">
+          <button id="add-tab" type="button">+ zakładka</button>
+          <button id="edit-tab" type="button" class="secondary" hidden>edytuj zakładkę</button>
+          <button id="add-item" type="button" hidden>+ pozycja</button>
+        </div>
       </header>
       <p id="tab-description"></p>
       <ul id="items"></ul>
       <p id="empty" hidden>Pusto.</p>
     </section>
+
+    <footer><button id="logout" type="button" class="link" hidden>Wyloguj</button></footer>
   </main>
+
+  <dialog id="tab-dialog">
+    <form id="tab-form">
+      <h2>Zakładka</h2>
+      <label>Nazwa <input name="name" required maxlength="60"></label>
+      <label>Opis <textarea name="description" rows="2" maxlength="500"></textarea></label>
+      <div class="actions">
+        <button type="submit">Zapisz</button>
+        <button type="button" class="secondary" data-cancel>Anuluj</button>
+        <button id="tab-delete" type="button" class="danger" hidden>Usuń</button>
+      </div>
+    </form>
+  </dialog>
+
+  <dialog id="item-dialog">
+    <form id="item-form">
+      <h2>Pozycja</h2>
+      <label>Tytuł <input name="title" required maxlength="200"></label>
+      <label>Link do sklepu <input name="url" type="url" placeholder="https://"></label>
+      <label>Link do zdjęcia <input name="imageUrl" type="url" placeholder="https://"></label>
+      <div class="row">
+        <label>Cena <input name="price" inputmode="decimal"></label>
+        <label>Waluta <input name="currency" maxlength="3" value="PLN"></label>
+      </div>
+      <label>Opis <textarea name="description" rows="3" maxlength="2000"></textarea></label>
+      <label>Zakładka <select name="tabId"></select></label>
+      <div class="actions">
+        <button type="submit">Zapisz</button>
+        <button type="button" class="secondary" data-cancel>Anuluj</button>
+        <button id="item-delete" type="button" class="danger" hidden>Usuń</button>
+      </div>
+    </form>
+  </dialog>
 </body>
 </html>

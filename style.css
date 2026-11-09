@@ -36,3 +36,23 @@ button.link { background: none; color: var(--muted); text-decoration: underline;
 .price { font-weight: 600; margin: 0 0 4px; }
 .description { margin: 0 0 8px; white-space: pre-line; }
 .find-in { color: var(--muted); font-size: .85rem; margin: 0; }
+
+/* Owner editing */
+.owner-only { display: none; }
+body.owner .owner-only { display: flex; }
+.toolbar { gap: 6px; flex-wrap: wrap; margin-bottom: 12px; }
+button.secondary { background: none; color: var(--fg); border: 1px solid var(--line); }
+button.danger { background: none; color: #dc2626; border: 1px solid #dc2626; margin-left: auto; }
+body.owner [draggable="true"] { cursor: grab; }
+.item button.link { margin-top: 6px; }
+footer { margin-top: 32px; text-align: center; }
+
+dialog { border: 1px solid var(--line); border-radius: 10px; background: var(--card); color: var(--fg); width: min(480px, calc(100vw - 32px)); }
+dialog::backdrop { background: rgb(0 0 0 / .4); }
+dialog form { display: grid; gap: 10px; }
+dialog h2 { margin: 0; }
+dialog label { display: grid; gap: 4px; font-size: .9rem; }
+textarea, select { font: inherit; padding: 8px 10px; border-radius: 6px; border: 1px solid var(--line); background: var(--bg); color: var(--fg); }
+dialog input { background: var(--bg); }
+.row { display: grid; grid-template-columns: 1fr 90px; gap: 8px; }
+.actions { display: flex; gap: 8px; }
