@@ -5,6 +5,11 @@ import { extract } from "./extract.js";
 
 const target = new URL("add.html", location.href);
 target.search = location.search; // keeps ?emulator in tests
-const code = `(()=>{const d=(${extract})(document);` +
-  `window.open(${JSON.stringify(target.href)}+"#"+encodeURIComponent(JSON.stringify(d)),"chce","width=640,height=820")})()`;
+// t busts the cache so a second click on an open popup navigates (a hash-only change would not
+// reload it); noopener keeps a hostile shop page from reaching the popup through window.opener.
+// popup=1 tells add.html it was opened by the bookmarklet, so it may close itself after saving.
+const code = `(()=>{try{const d=(${extract})(document);` +
+  `const u=new URL(${JSON.stringify(target.href)});u.searchParams.set("t",Date.now());u.searchParams.set("popup","1");` +
+  `window.open(u.href+"#"+encodeURIComponent(JSON.stringify(d)),"chce","width=640,height=820,noopener")}` +
+  `catch(e){alert("chce: nie udało się odczytać strony")}})()`;
 document.getElementById("bookmarklet").href = "javascript:" + encodeURIComponent(code);

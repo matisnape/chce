@@ -67,3 +67,9 @@ export async function seedList() {
   await seedDoc("lists/main/items/a", { tabId: "books", title: "Książka A", url: "https://shop.example/a", imageUrl: null, price: 49.9, currency: "PLN", description: "twarda okładka", order: 1 });
   await seedDoc("lists/main/items/b", { tabId: "books", title: "Książka B", url: "https://shop.example/b", imageUrl: null, price: null, currency: "PLN", description: "", order: 2 });
 }
+
+// Ids of the documents in a collection under lists/main, read as admin.
+export async function listIds(collection) {
+  const r = await fetch(`${DOCS}/lists/main/${collection}?pageSize=100`, { headers: admin });
+  return ((await r.json()).documents ?? []).map((d) => d.name.split("/").pop());
+}

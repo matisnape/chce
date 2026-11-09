@@ -1,6 +1,6 @@
 // Issue #3: the bookmarklet reads a shop page and the add popup saves it to a chosen tab.
 import { test, expect } from "@playwright/test";
-import { reset, seedList, OWNER } from "./emulator.js";
+import { reset, seedList, listIds, OWNER } from "./emulator.js";
 
 const FIXTURE = "http://127.0.0.1:4173/tests/fixtures";
 
@@ -9,18 +9,28 @@ test.beforeEach(async () => {
   await seedList();
 });
 
-// Runs the real bookmarklet code on a fixture shop page and returns the popup it opens.
-async function runBookmarklet(page, fixture, { owner = true } = {}) {
+// Auth persists per origin, so signing in on an app page covers the popup too.
+async function signInOwner(page) {
+  await page.goto("/index.html?emulator");
+  await page.waitForFunction(() => window.__signInOwner);
+  await page.evaluate(({ email, password }) => window.__signInOwner(email, password), OWNER);
+  await expect(page.locator("#add-item")).toBeVisible();
+}
+
+async function bookmarkletCode(page) {
   await page.goto("/bookmarklet.html?emulator");
   const href = await page.locator("#bookmarklet").getAttribute("href");
-  const code = decodeURIComponent(href.replace(/^javascript:/, ""));
-  if (owner) {
-    // Auth persists per origin, so signing in on an app page covers the popup too.
-    await page.goto("/index.html?emulator");
-    await page.waitForFunction(() => window.__signInOwner);
-    await page.evaluate(({ email, password }) => window.__signInOwner(email, password), OWNER);
-    await expect(page.locator("#add-item")).toBeVisible();
-  }
+  return decodeURIComponent(href.replace(/^javascript:/, ""));
+}
+
+// Runs the real bookmarklet code on a fixture shop page and returns the popup it opens.
+async function runBookmarklet(page, fixture, { owner = true } = {}) {
+  const code = await bookmarkletCode(page);
+  if (owner) await signInOwner(page);
+  return clickOn(page, code, fixture);
+}
+
+async function clickOn(page, code, fixture) {
   await page.goto(`${FIXTURE}/${fixture}.html`);
   const [popup] = await Promise.all([page.waitForEvent("popup"), page.evaluate(code)]);
   return popup;
@@ -75,10 +85,95 @@ test("og:image is a logo: another image can be picked and is the one saved", asy
     .toHaveAttribute("src", `${FIXTURE}/img/p3.svg`);
 });
 
-test("signed out: sign-in button, no form", async ({ page }) => {
+test("signed out: after auth resolves the form stays hidden, sign-in shows, nothing is written", async ({ page }) => {
   const popup = await runBookmarklet(page, "price-meta", { owner: false });
+  await expect(popup.locator("#loading")).toBeHidden();
   await expect(popup.locator("#owner-login")).toBeVisible();
   await expect(form(popup)).toBeHidden();
+  expect(await listIds("items")).toEqual(["a", "b"]);
+});
+
+test("a second click with the popup still open shows the second product", async ({ page }) => {
+  const code = await bookmarkletCode(page);
+  await signInOwner(page);
+  const first = await clickOn(page, code, "price-meta");
+  await expect(first.locator('[name="title"]')).toHaveValue("Mug Basalt");
+  const second = await clickOn(page, code, "no-price");
+  await expect(second.locator('[name="title"]')).toHaveValue("Scarf Fjord");
+});
+
+test("the popup is opened with noopener: window.opener is null", async ({ page }) => {
+  const popup = await runBookmarklet(page, "price-meta");
+  await expect(form(popup)).toBeVisible();
+  expect(await popup.evaluate(() => window.opener)).toBeNull();
+});
+
+test("the popup closes itself after saving even without window.opener", async ({ page }) => {
+  const popup = await runBookmarklet(page, "price-meta");
+  await expect(form(popup)).toBeVisible();
+  await popup.click('#add-form button[type="submit"]');
+  await expect(popup.locator("#saved")).toBeVisible();
+  await popup.waitForEvent("close");
+});
+
+test("a bookmarklet crash alerts instead of failing silently", async ({ page }) => {
+  const code = await bookmarkletCode(page);
+  await page.goto(`${FIXTURE}/price-meta.html`);
+  await page.evaluate(() => { document.querySelector = () => { throw new Error("boom"); }; });
+  const dialog = page.waitForEvent("dialog");
+  page.evaluate(code).catch(() => {});
+  const d = await dialog;
+  expect(d.message()).toBe("chce: nie udało się odczytać strony");
+  await d.dismiss();
+});
+
+test("related-products JSON-LD first: the product's own offer array wins, price over lowPrice", async ({ page }) => {
+  const popup = await runBookmarklet(page, "related-first");
+  await expect(popup.locator('[name="title"]')).toHaveValue("Chair Birch");
+  await expect(popup.locator('[name="price"]')).toHaveValue("199");
+  await expect(popup.locator('[name="currency"]')).toHaveValue("EUR");
+});
+
+test("lazy images: sized by layout, data-src used, unknown size last", async ({ page }) => {
+  const popup = await runBookmarklet(page, "lazy-images");
+  const srcs = popup.locator("#images img");
+  await expect(srcs).toHaveCount(3);
+  const got = await srcs.evaluateAll((l) => l.map((i) => i.getAttribute("src").split("/").pop()));
+  expect(got).toEqual(["p2.svg", "p1.svg", "p3.svg"]);
+});
+
+// Hash data is untrusted: these open the popup directly with a crafted hash.
+const withHash = async (page, data, raw) => {
+  await signInOwner(page);
+  await page.goto(`/add.html?emulator#${raw ?? encodeURIComponent(JSON.stringify(data))}`);
+};
+
+test("hash caps: long title cut, javascript: image dropped, description ignored", async ({ page }) => {
+  await withHash(page, {
+    title: "x".repeat(10000), url: "https://shop.example/p", price: "1".repeat(100), currency: "PLNXX",
+    description: "from the hash",
+    images: ["javascript:alert(1)", "https://shop.example/" + "a".repeat(3000), "https://shop.example/ok.jpg"],
+  });
+  await expect(form(page)).toBeVisible();
+  expect((await page.locator('[name="title"]').inputValue()).length).toBe(200);
+  await expect(page.locator('[name="description"]')).toHaveValue("");
+  await expect(page.locator("#images img")).toHaveCount(1);
+  await expect(page.locator("#images img")).toHaveAttribute("src", "https://shop.example/ok.jpg");
+  expect((await page.locator('[name="price"]').inputValue()).length).toBeLessThanOrEqual(32);
+});
+
+test("a malformed hash gives an empty form, not a crash", async ({ page }) => {
+  await withHash(page, null, "%E0%A4%A");
+  await expect(form(page)).toBeVisible();
+  await expect(page.locator('[name="title"]')).toHaveValue("");
+});
+
+test("a hash change in the open popup refills the fields", async ({ page }) => {
+  await withHash(page, { title: "First", url: "https://shop.example/1" });
+  await expect(page.locator('[name="title"]')).toHaveValue("First");
+  await page.evaluate((h) => { location.hash = h; }, encodeURIComponent(JSON.stringify({ title: "Second", url: "https://shop.example/2" })));
+  await expect(page.locator('[name="title"]')).toHaveValue("Second");
+  await expect(page.locator('[name="url"]')).toHaveValue("https://shop.example/2");
 });
 
 test("JSON-LD that is not valid JSON does not break extraction", async ({ page }) => {
