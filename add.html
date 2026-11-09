@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="pl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex, nofollow">
+  <meta name="referrer" content="no-referrer">
+  <title>chce · dodaj</title>
+  <link rel="stylesheet" href="style.css">
+  <script type="module" src="js/add.js"></script>
+</head>
+<body>
+  <main class="narrow">
+    <p id="loading">Ładowanie…</p>
+
+    <section id="signin" hidden>
+      <h1>Dodaj do chce</h1>
+      <p>Dodawać może tylko właścicielka listy.</p>
+      <button id="owner-login" type="button">Zaloguj przez Google</button>
+      <p id="signin-error" class="error" hidden></p>
+    </section>
+
+    <form id="add-form" hidden>
+      <h1>Dodaj do chce</h1>
+      <label>Zakładka <select name="tabId" required></select></label>
+      <label>Tytuł <input name="title" required maxlength="200"></label>
+      <div class="row">
+        <label>Cena <input name="price" inputmode="decimal"></label>
+        <label>Waluta <input name="currency" maxlength="3" value="PLN"></label>
+      </div>
+      <fieldset>
+        <legend>Zdjęcie</legend>
+        <div id="images" class="image-picker"></div>
+        <label>albo link do zdjęcia <input name="customImage" type="url" placeholder="https://"></label>
+      </fieldset>
+      <label>Opis <textarea name="description" rows="3" maxlength="2000"></textarea></label>
+      <label>Link do sklepu <input name="url" type="url" placeholder="https://"></label>
+      <div class="actions"><button type="submit">Zapisz</button></div>
+      <p id="add-error" class="error" hidden></p>
+    </form>
+
+    <section id="saved" hidden>
+      <h1>Zapisano ✓</h1>
+      <p><a id="saved-link" href="./">Zobacz listę</a></p>
+    </section>
+  </main>
+</body>
+</html>

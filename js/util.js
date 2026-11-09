@@ -19,3 +19,8 @@ export function safeUrl(value) {
     return u.protocol === "https:" || u.protocol === "http:" ? u.href : null;
   } catch { return null; }
 }
+
+// Order for a document appended at the end of a list.
+export function nextOrder(list) {
+  return list.reduce((max, x) => Math.max(max, x.order ?? 0), 0) + 1;
+}
