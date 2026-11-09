@@ -158,6 +158,19 @@ test("related-products JSON-LD first: the product's own offer array wins, price 
   await expect(popup.locator('[name="currency"]')).toHaveValue("EUR");
 });
 
+test("a Product nested in an ItemList does not beat the page's own Product", async ({ page }) => {
+  const popup = await runBookmarklet(page, "nested-product");
+  await expect(popup.locator('[name="title"]')).toHaveValue("Desk Oak");
+  await expect(popup.locator('[name="price"]')).toHaveValue("20");
+  await expect(popup.locator('[name="currency"]')).toHaveValue("EUR");
+});
+
+test("a JSON-LD name that is an object falls through to the page title", async ({ page }) => {
+  const popup = await runBookmarklet(page, "object-name");
+  await expect(popup.locator('[name="title"]')).toHaveValue("Shelf Pine - Fake Shop");
+  await expect(popup.locator('[name="price"]')).toHaveValue("30");
+});
+
 test("lazy images: sized by layout, data-src used, unknown size last", async ({ page }) => {
   const popup = await runBookmarklet(page, "lazy-images");
   const srcs = popup.locator("#images img");

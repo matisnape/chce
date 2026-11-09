@@ -11,20 +11,28 @@ export function extract(doc) {
     }
     return null;
   };
+  const text = (v) => (typeof v === "string" ? v.trim() : ""); // JSON-LD names may be objects
   const abs = (u) => { try { const x = new URL(u, doc.baseURI); return /^https?:$/.test(x.protocol) ? x.href : null; } catch { return null; } };
 
   // JSON-LD: walk every object (arrays, @graph) and collect offers and images.
   const nodes = [];
+  const tops = []; // objects at the top of a script or directly in its @graph
   const walk = (v) => {
     if (Array.isArray(v)) v.forEach(walk);
     else if (v && typeof v === "object") { nodes.push(v); Object.values(v).forEach(walk); }
   };
   for (const s of doc.querySelectorAll('script[type="application/ld+json"]')) {
-    try { walk(JSON.parse(s.textContent)); } catch { /* broken JSON-LD is common; skip it */ }
+    try {
+      const j = JSON.parse(s.textContent);
+      walk(j);
+      for (const r of [].concat(j)) if (r && typeof r === "object") tops.push(r, ...[].concat(r["@graph"] ?? []));
+    } catch { /* broken JSON-LD is common; skip it */ }
   }
   const hasPrice = (n) => n && typeof n === "object" && (n.price != null || n.lowPrice != null);
-  const products = nodes.filter((n) => [].concat(n["@type"]).includes("Product"));
-  const product = products.find((p) => p.offers) ?? products[0];
+  const isProduct = (n) => n && typeof n === "object" && [].concat(n["@type"]).includes("Product");
+  // A Product at the top level beats one nested in an ItemList or isRelatedTo.
+  const pick = (list) => list.find((p) => p.offers) ?? list[0];
+  const product = pick(tops.filter(isProduct)) ?? pick(nodes.filter(isProduct));
   // The product's own offer first (object, array, AggregateOffer); the global search is a fallback.
   const offer = [].concat(product?.offers ?? []).find(hasPrice) ?? nodes.find(hasPrice);
   const offerPrice = offer ? offer.price ?? offer.lowPrice : null;
@@ -55,7 +63,7 @@ export function extract(doc) {
 
   return {
     url: doc.location.href,
-    title: (meta("og:title") ?? product?.name ?? doc.title ?? "").trim(),
+    title: [meta("og:title"), product?.name, doc.title].map(text).find(Boolean) ?? "",
     price,
     currency,
     images,
