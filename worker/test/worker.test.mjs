@@ -231,6 +231,7 @@ const server = http.createServer((req, res) => {
     case "/to-port": return send(302, { Location: "http://shop.test:22/x" });
     case "/to-file": return send(302, { Location: "file:///etc/passwd" });
     case "/loop": return send(302, { Location: "/loop" });
+    case "/hang": return; // never answers
     default: return send(404, html, "nope");
   }
 });
@@ -284,8 +285,19 @@ test("a redirect to 127.0.0.1 gives 400 through the handler", async () => {
   assert.deepEqual(await res.json(), { error: "bad_url" });
 });
 
-test("fetchPage gives up after 5 redirects", async () => {
-  await assert.rejects(fetchPage("http://shop.test/loop"), refused(0));
+test("fetchPage gives up after 5 redirects: the first fetch plus 5 hops", async () => {
+  let fetches = 0;
+  const counting = createFetchPage((u, init) => { fetches++; return toLocal(u, init); });
+  await assert.rejects(counting("http://shop.test/loop"), refused(0));
+  assert.equal(fetches, 6);
+});
+
+test("fetchPage aborts a shop that never answers at the timeout", { timeout: 5_000 }, async () => {
+  const slow = createFetchPage(toLocal, { timeoutMs: 300 });
+  const t0 = Date.now();
+  await assert.rejects(slow("http://shop.test/hang"), refused(0));
+  const took = Date.now() - t0;
+  assert.ok(took >= 250 && took < 2_000, `aborted after ${took} ms`);
 });
 
 test("an oversized head is cut at a tag boundary, never inside a script or a tag", () => {

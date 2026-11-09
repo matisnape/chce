@@ -111,9 +111,9 @@ function decode(bytes, contentType) {
 
 // Returns a fetchPage: { html, finalUrl }. Throws FetchError(status) when the shop does not hand over HTML,
 // BadTarget when a redirect leads somewhere checkTarget refuses. Redirects are followed by hand so every hop is checked.
-export function createFetchPage(fetchImpl = fetch) {
+export function createFetchPage(fetchImpl = fetch, { timeoutMs = TIMEOUT_MS } = {}) {
   return async (startUrl) => {
-    const signal = AbortSignal.timeout(TIMEOUT_MS);
+    const signal = AbortSignal.timeout(timeoutMs);
     let url = startUrl;
     for (let hop = 0; hop <= MAX_HOPS; hop++) {
       let res;
