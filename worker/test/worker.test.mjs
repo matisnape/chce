@@ -141,13 +141,19 @@ const ITEMPROP_PAGE = `<html><head><title>Shoe</title><base href="https://cdn.ex
   <span class="p" itemprop="price">19<small>,99</small></span><meta itemprop="priceCurrency" content="EUR">
   <span itemprop="priceValidUntil">2030</span><img src="a.jpg" width="300" height="300"></body></html>`;
 
+// Nested same-name tags, followed by JSON-LD that a wrong close would pull into the price.
+const NESTED_PAGE = `<html><head><title>Boot</title></head><body>
+  <span itemprop="price"><span>49</span><span>,90</span></span><meta itemprop="priceCurrency" content="PLN">
+  <script type="application/ld+json">{"@type":"BreadcrumbList","itemListElement":[]}</script></body></html>`;
+
 test("slimmed and full parse give the same result on the fixtures", () => {
-  for (const html of [PRODUCT_PAGE, ITEMPROP_PAGE]) {
+  for (const html of [PRODUCT_PAGE, ITEMPROP_PAGE, NESTED_PAGE]) {
     const url = "https://shop.example/final/p";
     assert.deepEqual(extractFromHtml(html, url), extractFromHtml(html, url, { full: true }));
   }
   assert.equal(extractFromHtml(ITEMPROP_PAGE, SHOP).price, "19,99");
   assert.equal(extractFromHtml(ITEMPROP_PAGE, SHOP).currency, "EUR");
+  assert.equal(extractFromHtml(NESTED_PAGE, SHOP).price, "49,90");
 });
 
 test("a 1.5 MB page slims under 100 KB and still gives the full-parse result", () => {
@@ -280,4 +286,15 @@ test("a redirect to 127.0.0.1 gives 400 through the handler", async () => {
 
 test("fetchPage gives up after 5 redirects", async () => {
   await assert.rejects(fetchPage("http://shop.test/loop"), refused(0));
+});
+
+test("an oversized head is cut at a tag boundary, never inside a script or a tag", () => {
+  const ld = (n) => `<script type="application/ld+json">{"@type":"Product","name":"${"n".repeat(n)}"}</script>`;
+  // ~130 KB: the 100 KB cut lands inside the second JSON-LD block
+  const head = `<title>t</title>${ld(30_000)}${'<meta name="k" content="v">'.repeat(1_500)}${ld(60_000)}`;
+  const slim = slimHtml(`<html><head>${head}</head><body></body></html>`);
+  assert.ok(slim.length < 100_000, `slimmed is ${slim.length} bytes`);
+  assert.equal(slim.match(/<script/g).length, slim.match(/<\/script>/g).length, "every <script> is closed");
+  assert.ok(slim.split("<body>")[0].endsWith(">"), "the head ends at a tag");
+  assert.ok(slim.includes("<title>t</title>"));
 });

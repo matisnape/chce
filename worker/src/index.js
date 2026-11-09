@@ -33,6 +33,15 @@ async function findKey(kid, { fetchKeys, now, cache }) {
   return jwk;
 }
 
+// Shortens `s` to at most `max` chars without cutting inside a tag or an open <script>.
+function cutAtBoundary(s, max) {
+  if (s.length <= max) return s;
+  let cut = s.slice(0, max);
+  const open = cut.lastIndexOf("<script");
+  if (open > cut.lastIndexOf("</script>")) cut = cut.slice(0, open);
+  return cut.slice(0, cut.lastIndexOf(">") + 1);
+}
+
 // Returns the verified claims, or throws.
 async function verifyToken(token, env, { fetchKeys, now, cache }) {
   const [h, p, s, extra] = token.split(".");
@@ -141,17 +150,23 @@ export function slimHtml(html) {
     head = `<head>${html.slice(0, b < 0 ? 100_000 : Math.min(b, 100_000))}</head>`; rest = html;
   }
   // Inline CSS/JS in the head is bulk; only JSON-LD scripts and metadata matter.
-  head = head.replace(/<style[\s\S]*?<\/style>|<!--[\s\S]*?-->|<script\b(?![^>]*ld\+json)[\s\S]*?<\/script>/gi, "").slice(0, 100_000);
+  head = cutAtBoundary(head.replace(/<style[\s\S]*?<\/style>|<!--[\s\S]*?-->|<script\b(?![^>]*ld\+json)[\s\S]*?<\/script>/gi, ""), 100_000);
   if (!/<base\b/i.test(head)) head = head.replace(/<head(?:\s[^>]*)?>/i, (h) => h + (/<base\b[^>]*>/i.exec(rest)?.[0] ?? ""));
 
   const take = (re, n, each) => { const out = []; for (let m; out.length < n && (m = re.exec(rest)); ) each(m, out); return out; };
   const ld = take(/<script\b[^>]*type\s*=\s*["']?application\/ld\+json[^>]*>[\s\S]*?<\/script>/gi, 20,
-    (m, out) => { if (m[0].length <= 65_536) out.push(m[0]); }); // a cut-off block would swallow what follows
+    (m, out) => { if (m[0].length <= 65_536) out.push(m[0]); }); // over 64 KB is skipped whole, to save CPU: JSON.parse of a huge block costs more than the page is worth
   const props = take(/<([a-z][a-z0-9]*)\b[^>]*\bitemprop\s*=\s*["']?(?:price|priceCurrency)(?=["'\s>])[^>]*>/gi, 40, (m, out) => {
     let s = m[0];
     if (!VOID.test(m[1])) {
       const tail = rest.slice(m.index + s.length, m.index + s.length + 500);
-      const end = tail.toLowerCase().indexOf(`</${m[1].toLowerCase()}>`);
+      // The matching close: a same-name tag inside opens a nested level (<span itemprop="price"><span>49</span>...).
+      const tags = new RegExp(`<(/?)${m[1]}\\b[^>]*>`, "gi");
+      let depth = 1, end = -1;
+      for (let t; (t = tags.exec(tail)); ) {
+        depth += t[1] ? -1 : 1;
+        if (depth === 0) { end = t.index; break; }
+      }
       s += (end < 0 ? "" : tail.slice(0, end)) + `</${m[1]}>`;
     }
     out.push(s);
