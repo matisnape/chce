@@ -78,9 +78,12 @@ function fillFields(d, track = false) {
   if (priceFree) {
     set(f.price, parsePrice(d.price) ?? "");
     if (track) last.price = f.price.value;
-    if (/^[A-Za-z]{3}$/.test(d.currency) && free(f.currency, last.currency, f.currency.defaultValue)) {
-      set(f.currency, d.currency.toUpperCase());
-      if (track) last.currency = f.currency.value;
+    // The default counts as free only until a fetch has set the currency, so a hand-typed default stays.
+    const def = f.currency.defaultValue;
+    if (free(f.currency, last.currency, ...(track && last.currency ? [] : [def]))) {
+      const cur = /^[A-Za-z]{3}$/.test(d.currency) ? d.currency.toUpperCase() : def; // no valid currency: drop a stale one
+      set(f.currency, cur);
+      if (track) last.currency = cur === def ? "" : cur;
     }
   }
   show("saved", false);
@@ -113,13 +116,14 @@ function imageChoice(src, checked) {
   return label;
 }
 
+const fetchBtn = $("fetch-link");
 const saveBtn = form.querySelector('button[type="submit"]');
 let running = null; // AbortController of the fetch in flight, if any
 
 form.addEventListener("submit", async (e) => {
   e.preventDefault();
   if (saveBtn.disabled) return;
-  saveBtn.disabled = true; // one save at a time; re-enabled only when it fails
+  saveBtn.disabled = fetchBtn.disabled = true; // one save at a time, and no fetch fills fields meanwhile
   running?.abort("saving"); // a late Worker reply must not refill the form after the save
   show("add-error", false);
   const v = (name) => form.elements[name].value.trim();
@@ -145,14 +149,13 @@ form.addEventListener("submit", async (e) => {
   } catch (err) {
     $("add-error").textContent = `Nie udało się zapisać: ${err.code ?? err.message}`;
     show("add-error");
-    saveBtn.disabled = false;
+    saveBtn.disabled = fetchBtn.disabled = false;
   }
 });
 
 // --- fetch from a pasted link (phone flow, decisions 17 and 18) ---
 
 const FETCH_TIMEOUT_MS = EMULATOR ? Number(new URLSearchParams(location.search).get("fetchTimeout")) || 10_000 : 10_000;
-const fetchBtn = $("fetch-link");
 const note = (text, isError = false) => {
   const el = $("fetch-status");
   el.textContent = text;
@@ -199,6 +202,6 @@ fetchBtn.addEventListener("click", async () => {
   } finally {
     clearTimeout(timer);
     if (running === ctl) running = null;
-    fetchBtn.disabled = false;
+    fetchBtn.disabled = saveBtn.disabled; // stays off while a save runs
   }
 });

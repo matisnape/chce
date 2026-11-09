@@ -236,3 +236,56 @@ test("images that came in the popup hash are kept when the fetch brings others",
   expect(await imageSrcs(page)).toEqual(["https://shop.example/h.jpg"]);
   await expect(page.locator('[name="title"]')).toHaveValue("Z hasha");
 });
+
+test("a hand-set currency equal to the default survives the next fetch", async ({ page }) => {
+  await stub(page, byLink({ [LINK]: { ...FOUND, price: "10" }, [LINK_B]: { ...FOUND_B, price: "20", currency: "EUR" } }));
+  await openAdd(page);
+  await paste(page);
+  await fetchBtn(page).click();
+  await expect(page.locator('[name="currency"]')).toHaveValue("EUR");
+  await page.fill('[name="currency"]', "PLN");
+  await paste(page, LINK_B);
+  await fetchBtn(page).click();
+  await expect(status(page)).toContainText("Dane pobrane");
+  await expect(page.locator('[name="price"]')).toHaveValue("20");
+  await expect(page.locator('[name="currency"]')).toHaveValue("PLN");
+});
+
+test("a corrected link with a price but no currency drops the stale currency", async ({ page }) => {
+  await stub(page, byLink({ [LINK]: FOUND, [LINK_B]: { url: LINK_B, title: "Lamp Borealis", price: "310", images: [] } }));
+  await openAdd(page);
+  await paste(page);
+  await fetchBtn(page).click();
+  await expect(page.locator('[name="currency"]')).toHaveValue("EUR");
+  await paste(page, LINK_B);
+  await fetchBtn(page).click();
+  await expect(page.locator('[name="price"]')).toHaveValue("310");
+  await expect(page.locator('[name="currency"]')).toHaveValue("PLN");
+});
+
+test("the fetch button is disabled as soon as a save starts", async ({ page }) => {
+  await openAdd(page);
+  await page.fill('[name="title"]', "Ręcznie");
+  const during = await page.evaluate(() => {
+    document.getElementById("add-form").requestSubmit(); // the handler sets the buttons before its first await
+    return document.getElementById("fetch-link").disabled;
+  });
+  expect(during).toBe(true);
+  await expect(page.locator("#saved")).toBeVisible();
+});
+
+test("a failed save can be retried: one item, buttons usable again", async ({ page }) => {
+  await openAdd(page);
+  await page.fill('[name="title"]', "Ręcznie");
+  await page.evaluate(() => window.__signOut()); // the write is then refused by the rules
+  await page.evaluate(() => document.getElementById("add-form").requestSubmit());
+  await expect(page.locator("#add-error")).toContainText("Nie udało się zapisać");
+  expect(await listIds("items")).toHaveLength(2);
+  await page.evaluate(({ email, password }) => window.__signInOwner(email, password), OWNER);
+  await expect(page.locator("#add-form")).toBeVisible();
+  await expect(page.locator('button[type="submit"]')).toBeEnabled();
+  await expect(fetchBtn(page)).toBeEnabled();
+  await page.click('button[type="submit"]');
+  await expect(page.locator("#saved")).toBeVisible();
+  expect(await listIds("items")).toHaveLength(3);
+});
