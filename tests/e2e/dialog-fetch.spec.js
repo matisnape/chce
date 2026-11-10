@@ -94,19 +94,43 @@ test("editing an existing item shows no fetch button", async ({ page }) => {
   await expect(fetchBtn(page)).toBeVisible();
 });
 
-test("a reply that arrives after save does not refill the next dialog", async ({ page }) => {
+// The Worker answers only when `release()` is called, so a test decides where the late reply lands.
+function gatedWorker() {
   let release;
   const gate = new Promise((ok) => { release = ok; });
-  await stub(page, async (route) => { await gate; await fulfill(route, 200, FOUND); });
+  return { release: () => release(), reply: async (route) => { await gate; await fulfill(route, 200, FOUND); } };
+}
+
+test("a reply that arrives after save does not refill the reopened dialog", async ({ page }) => {
+  const w = gatedWorker();
+  await stub(page, w.reply);
   await openAndPaste(page);
   await fetchBtn(page).click();
   await field(page, "title").fill("Ręcznie");
   await page.click('#item-form button[type="submit"]');
   await expect(page.locator("#item-dialog")).toBeHidden();
-  release();
-  await page.waitForTimeout(500);
   await page.click("#add-item");
+  w.release(); // the late reply lands while the new dialog is open
+  await page.waitForTimeout(500);
   await expect(field(page, "title")).toHaveValue("");
+  await expect(field(page, "price")).toHaveValue("");
   await expect(status(page)).toBeHidden();
+  await expect(page.locator("#item-images")).toBeHidden();
   expect(await listIds("items")).toHaveLength(3);
+});
+
+test("a reply that arrives after Anuluj does not refill the reopened dialog", async ({ page }) => {
+  const w = gatedWorker();
+  await stub(page, w.reply);
+  await openAndPaste(page);
+  await fetchBtn(page).click();
+  await page.click("#item-dialog [data-cancel]");
+  await expect(page.locator("#item-dialog")).toBeHidden();
+  await page.click("#add-item");
+  w.release();
+  await page.waitForTimeout(500);
+  await expect(field(page, "title")).toHaveValue("");
+  await expect(field(page, "price")).toHaveValue("");
+  await expect(status(page)).toBeHidden();
+  await expect(page.locator("#item-images")).toBeHidden();
 });
