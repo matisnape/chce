@@ -126,6 +126,7 @@ dialog h2 { margin: 0; }
 dialog label { display: grid; gap: 4px; font-size: .9rem; }
 textarea, select { font: inherit; padding: 8px 10px; border-radius: 6px; border: 1px solid var(--line); background: var(--bg); color: var(--fg); }
 dialog input { background: var(--bg); }
+input, select, textarea { font-size: 1rem; } /* iOS zooms on focus below 16px (#26) */
 .row { display: grid; grid-template-columns: 1fr 90px; gap: 8px; }
 .row input { width: 100%; min-width: 0; }
 .actions { display: flex; gap: 8px; }
