@@ -1,10 +1,10 @@
 // The add popup: the bookmarklet opens it with the shop page's data in the URL hash.
 // Without a hash it is a plain manual add form.
 import { OWNER_UID, EMULATOR, WORKER_URL } from "./config.js";
-import { parsePrice, safeUrl, nextOrder } from "./util.js";
+import { parsePrice, safeUrl, nextOrder, findDuplicate, duplicateText } from "./util.js";
 import { auth, fbAuth, fbStore, tabsCol, itemsCol, signInOwnerWithGoogle } from "./firebase.js";
 
-const { getDocs, query, orderBy, where, addDoc, serverTimestamp } = fbStore;
+const { getDocs, query, orderBy, addDoc, serverTimestamp } = fbStore;
 const $ = (id) => document.getElementById(id);
 const show = (id, on = true) => { $(id).hidden = !on; };
 const form = $("add-form");
@@ -120,8 +120,15 @@ const fetchBtn = $("fetch-link");
 const saveBtn = form.querySelector('button[type="submit"]');
 let running = null; // AbortController of the fetch in flight, if any
 
+let dupConfirmed = false;
+form.addEventListener("input", () => show("dup-warning", false));
+$("dup-cancel").addEventListener("click", () => { show("dup-warning", false); saveBtn.focus(); });
+$("dup-confirm").addEventListener("click", () => { dupConfirmed = true; form.requestSubmit(); });
+
 form.addEventListener("submit", async (e) => {
   e.preventDefault();
+  const confirmed = dupConfirmed;
+  dupConfirmed = false;
   if (saveBtn.disabled) return;
   saveBtn.disabled = fetchBtn.disabled = true; // one save at a time, and no fetch fills fields meanwhile
   running?.abort("saving"); // a late Worker reply must not refill the form after the save
@@ -129,7 +136,17 @@ form.addEventListener("submit", async (e) => {
   const v = (name) => form.elements[name].value.trim();
   const tabId = v("tabId");
   try {
-    const inTab = (await getDocs(query(itemsCol, where("tabId", "==", tabId)))).docs.map((d) => d.data());
+    const all = (await getDocs(itemsCol)).docs.map((d) => d.data());
+    const dup = !confirmed && findDuplicate({ url: v("url"), title: v("title"), tabId }, all);
+    if (dup) {
+      const tabName = form.elements.tabId.querySelector(`option[value="${CSS.escape(dup.tabId)}"]`)?.textContent ?? "?";
+      $("dup-warning").firstElementChild.textContent = duplicateText(dup, tabName);
+      show("dup-warning");
+      saveBtn.disabled = fetchBtn.disabled = false;
+      $("dup-confirm").focus();
+      return;
+    }
+    const inTab = all.filter((i) => i.tabId === tabId);
     await addDoc(itemsCol, {
       tabId,
       title: v("title"),

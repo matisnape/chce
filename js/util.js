@@ -42,3 +42,28 @@ export function pluralItems(n) {
   const few = n % 10 >= 2 && n % 10 <= 4 && (n % 100 < 10 || n % 100 >= 20);
   return `${n} ${few ? "pozycje" : "pozycji"}`;
 }
+
+// Link as compared for duplicates: host lowercased, "www." and #fragment dropped, utm_*/gclid/fbclid
+// dropped, trailing "/" dropped. Other query parameters stay (shops put product ids there).
+// Empty or unreadable gives "".
+export function normalizeUrl(value) {
+  if (!safeUrl(value)) return ""; // what is not saved as a link is not a link
+  const u = new URL(value);
+  for (const k of [...u.searchParams.keys()]) if (/^(utm_|gclid$|fbclid$)/i.test(k)) u.searchParams.delete(k);
+  const q = String(u.searchParams); // always re-serialised, so a dropped param cannot change the encoding of the rest
+  return `${u.protocol}//${u.host.replace(/^www\./, "")}${u.pathname.replace(/\/$/, "")}${q ? "?" + q : ""}`;
+}
+
+// The existing item a new {url, title, tabId} duplicates, or undefined. Two links compare normalised,
+// in any tab. With no link on either side, the same title (case and outer spaces ignored) in the same tab.
+export function findDuplicate({ url, title, tabId }, items) {
+  const key = normalizeUrl(url ?? "");
+  const name = title.trim().toLowerCase();
+  return items.find((i) => {
+    const other = normalizeUrl(i.url ?? "");
+    if (key || other) return key === other;
+    return i.tabId === tabId && i.title.trim().toLowerCase() === name;
+  });
+}
+
+export const duplicateText = (item, tabName) => `Taka pozycja już jest: „${item.title}” w zakładce „${tabName}”.`;
