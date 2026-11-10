@@ -55,6 +55,7 @@ dialog label { display: grid; gap: 4px; font-size: .9rem; }
 textarea, select { font: inherit; padding: 8px 10px; border-radius: 6px; border: 1px solid var(--line); background: var(--bg); color: var(--fg); }
 dialog input { background: var(--bg); }
 .row { display: grid; grid-template-columns: 1fr 90px; gap: 8px; }
+.row input { width: 100%; min-width: 0; }
 .actions { display: flex; gap: 8px; }
 
 /* Add popup and bookmarklet page */
