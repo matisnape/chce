@@ -87,6 +87,9 @@
       <h2>Pozycja</h2>
       <label>Tytuł <input name="title" required maxlength="200"></label>
       <label>Link do sklepu <input name="url" type="url" placeholder="https://"></label>
+      <div class="actions" id="item-fetch-row" hidden><button id="item-fetch" type="button">Pobierz dane z linku</button></div>
+      <p id="item-fetch-status" role="status" hidden></p>
+      <div id="item-images" class="image-picker" hidden></div>
       <label>Link do zdjęcia <input name="imageUrl" type="url" placeholder="https://"></label>
       <div class="row">
         <label>Cena <input name="price" inputmode="decimal"></label>

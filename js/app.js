@@ -1,5 +1,6 @@
 import { GUEST_EMAIL, OWNER_UID } from "./config.js";
 import { parsePrice, formatPrice, safeUrl, nextOrder, pluralItems, findDuplicate, duplicateText } from "./util.js";
+import { setupLinkFetch } from "./fetch-link.js";
 import { auth, fbAuth, fbStore, listRef, tabsCol, itemsCol, signInOwnerWithGoogle } from "./firebase.js";
 
 const { onAuthStateChanged, signInWithEmailAndPassword, signOut } = fbAuth;
@@ -233,8 +234,24 @@ function openItemForm(item) {
   f.elements.tabId.replaceChildren(...tabs.map((t) => el("option", { value: t.id }, t.name)));
   f.elements.tabId.value = item.tabId ?? currentTabId() ?? tabs[0]?.id;
   show("item-delete", !!item.id);
+  itemFetch.reset();
+  show("item-images", false);
+  show("item-fetch-row", !item.id); // the fetch button is for creating only
   $("item-dialog").showModal();
 }
+
+// "Pobierz dane z linku" in the new-item dialog: the same fetch as the add popup (fetch-link.js).
+const itemFetch = setupLinkFetch({
+  form: $("item-form"), button: $("item-fetch"), images: $("item-images"), custom: "imageUrl", syncCustom: true,
+  afterFill: () => show("item-images"),
+  note: (text, isError = false) => {
+    const p = $("item-fetch-status");
+    p.textContent = text;
+    p.className = isError ? "error" : "";
+    p.hidden = !text;
+  },
+});
+$("item-dialog").addEventListener("close", () => itemFetch.cancel("closed"));
 
 // A new item that duplicates an existing one waits for "Dodaj mimo to"; editing never warns.
 let dupConfirmed = false;
@@ -255,6 +272,7 @@ $("item-form").addEventListener("submit", (e) => {
     return;
   }
   show("dup-warning", false);
+  itemFetch.cancel("saving"); // a late Worker reply must not refill the dialog after the save
   submitDialog(e, "item-dialog", async (f) => {
   const v = (name) => f.elements[name].value.trim();
   const data = {
