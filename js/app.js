@@ -1,5 +1,5 @@
 import { GUEST_EMAIL, OWNER_UID } from "./config.js";
-import { parsePrice, formatPrice, safeUrl, nextOrder } from "./util.js";
+import { parsePrice, formatPrice, safeUrl, nextOrder, pluralItems } from "./util.js";
 import { auth, fbAuth, fbStore, listRef, tabsCol, itemsCol, signInOwnerWithGoogle } from "./firebase.js";
 
 const { onAuthStateChanged, signInWithEmailAndPassword, signOut } = fbAuth;
@@ -54,58 +54,100 @@ async function reload() {
       getDocs(query(tabsCol, orderBy("order"))),
       getDocs(query(itemsCol, orderBy("order"))),
     ]);
-    $("list-title").textContent = (listSnap.exists() && listSnap.data().title) || "chce";
+    setBrand((listSnap.exists() && listSnap.data().title) || "chce");
     tabs = tabSnap.docs.map((d) => ({ id: d.id, ...d.data() }));
     items = itemSnap.docs.map((d) => ({ id: d.id, ...d.data() }));
     render();
   } catch (e) {
-    $("list-title").textContent = e.code === "permission-denied" ? "Brak dostępu do listy." : `Błąd: ${e.code ?? e.message}`;
+    setBrand(e.code === "permission-denied" ? "Brak dostępu do listy." : `Błąd: ${e.code ?? e.message}`);
   }
   show("list");
 }
 
 window.addEventListener("hashchange", render);
 
+function setBrand(text) {
+  for (const n of document.querySelectorAll(".brand-name")) n.textContent = text;
+}
+
+// null means the All view: no hash, or a hash that names no tab.
 function currentTabId() {
   const id = new URLSearchParams(location.hash.slice(1)).get("tab");
-  return tabs.some((t) => t.id === id) ? id : tabs[0]?.id;
+  return tabs.some((t) => t.id === id) ? id : null;
 }
+
+const IMAGE_ICON = '<svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="9" cy="10" r="1.6"/><path d="M21 16l-5-5-8 8"/></svg>';
+const PENCIL_ICON = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" aria-hidden="true"><path d="M4 20h4L19 9l-4-4L4 16v4z"/><path d="M13.5 6.5l4 4"/></svg>';
+const PHONE_CHIPS = 4; // "Wszystko" counts as one; the rest hide behind "+N więcej" on narrow screens (see style.css)
+
+let moreOpen = false;
+let lastTabId;
 
 function render() {
   const tabId = currentTabId();
-  $("tabs").replaceChildren(...tabs.map((t) => {
-    const a = el("a", { href: `#tab=${encodeURIComponent(t.id)}`, "data-id": t.id }, t.name);
-    if (t.id === tabId) a.setAttribute("aria-current", "page");
-    if (isOwner) makeDraggable(a, "tab");
-    return a;
-  }));
   const tab = tabs.find((t) => t.id === tabId);
+  const countIn = (id) => items.filter((i) => i.tabId === id).length;
+
+  const nav = [el("a", { href: "#", "data-id": "all" }, el("span", { class: "name" }, "Wszystko"), el("span", { class: "count" }, String(items.length)))];
+  for (const t of tabs) {
+    const a = el("a", { href: `#tab=${encodeURIComponent(t.id)}`, "data-id": t.id }, el("span", { class: "name" }, t.name), el("span", { class: "count" }, String(countIn(t.id))));
+    if (isOwner) makeDraggable(a, "tab");
+    nav.push(a);
+  }
+  nav.find((a) => a.dataset.id === (tabId ?? "all")).setAttribute("aria-current", "page");
+  // A tab past the 4th chip opens the list when it becomes active, so it is never hidden.
+  if (tabId !== lastTabId && nav.findIndex((a) => a.dataset.id === (tabId ?? "all")) >= PHONE_CHIPS) moreOpen = true;
+  lastTabId = tabId;
+  const hiddenChips = nav.length - PHONE_CHIPS;
+  const more = el("button", { type: "button", id: "tabs-more", "aria-expanded": String(moreOpen) }, moreOpen ? "Mniej" : `+${hiddenChips} więcej`);
+  more.hidden = hiddenChips <= 0;
+  more.addEventListener("click", () => { moreOpen = !moreOpen; render(); });
+  $("tabs").classList.toggle("expanded", moreOpen);
+  // Rebuilding the nav drops keyboard focus; put it back on the same control.
+  const focused = $("tabs").contains(document.activeElement) ? document.activeElement : null;
+  $("tabs").replaceChildren(...nav, more);
+  if (focused) (focused.id === "tabs-more" ? more : nav.find((a) => a.dataset.id === focused.dataset.id))?.focus();
+
+  const shown = tab ? [tab] : tabs;
+  const shownCount = tab ? countIn(tab.id) : items.length;
+  $("view-title").textContent = tab ? tab.name : "Wszystko";
+  $("view-count").textContent = pluralItems(shownCount);
   $("tab-description").textContent = tab?.description ?? "";
-  show("edit-tab", isOwner && !!tab);
-  show("add-item", isOwner && !!tab);
-  const shown = items.filter((i) => i.tabId === tabId);
-  $("items").replaceChildren(...shown.map(itemCard));
+  $("edit-tab").textContent = tab ? `Edytuj zakładkę „${tab.name}”` : "";
+  show("edit-tab", !!tab);
+  show("add-item", isOwner && tabs.length > 0);
+  $("sections").replaceChildren(...shown.map((t) => {
+    const section = el("section", { class: "tab-section" });
+    const mine = items.filter((i) => i.tabId === t.id);
+    if (!tab) section.append(el("div", { class: "section-head" }, el("h2", {}, t.name), el("span", {}, pluralItems(mine.length))));
+    if (mine.length) section.append(el("ul", { class: "items" }, ...mine.map(itemCard)));
+    return section;
+  }));
   $("empty").textContent = tabs.length ? "Pusto." : isOwner ? "Dodaj pierwszą zakładkę." : "Pusto.";
-  show("empty", shown.length === 0);
+  show("empty", shownCount === 0);
 }
 
 function itemCard(item) {
   const url = safeUrl(item.url);
   const img = safeUrl(item.imageUrl);
   const li = el("li", { class: "item", "data-id": item.id });
-  if (img) li.append(el("img", { src: img, alt: "", loading: "lazy", referrerpolicy: "no-referrer" }));
+  const tile = el("div", { class: "tile" });
+  if (img) tile.append(el("img", { src: img, alt: "", loading: "lazy", referrerpolicy: "no-referrer" }));
+  else tile.insertAdjacentHTML("beforeend", IMAGE_ICON);
+  li.append(tile);
   const body = el("div", { class: "item-body" });
-  body.append(el("h2", {}, url ? el("a", { href: url, rel: "noopener noreferrer", target: "_blank" }, item.title) : item.title));
+  body.append(el("h3", {}, url ? el("a", { href: url, rel: "noopener noreferrer", target: "_blank" }, item.title) : item.title));
   if (item.price != null && item.price !== "") body.append(el("p", { class: "price" }, formatPrice(item.price, item.currency)));
   if (item.description) body.append(el("p", { class: "description" }, item.description));
   body.append(findIn(item.title, url));
+  li.append(body);
   if (isOwner) {
-    const edit = el("button", { type: "button", class: "link" }, "edytuj");
+    const edit = el("button", { type: "button", class: "icon-btn item-edit", "aria-label": "Edytuj pozycję" });
+    edit.insertAdjacentHTML("beforeend", PENCIL_ICON);
     edit.addEventListener("click", () => openItemForm(item));
-    body.append(edit);
+    li.append(edit);
     makeDraggable(li, "item");
   }
-  li.append(body);
   return li;
 }
 
@@ -127,8 +169,30 @@ function findIn(title, url) {
 
 // ---------- owner: tabs ----------
 
-$("add-tab").addEventListener("click", () => openTabForm(null));
-$("edit-tab").addEventListener("click", () => openTabForm(tabs.find((t) => t.id === currentTabId())));
+$("add-tab").addEventListener("click", () => { closeMenu(); openTabForm(null); });
+$("edit-tab").addEventListener("click", () => { closeMenu(); openTabForm(tabs.find((t) => t.id === currentTabId())); });
+
+// ---------- sidebar toggle and the ⋯ menu ----------
+
+$("sidebar-toggle").addEventListener("click", () => {
+  const closed = $("list").classList.toggle("sidebar-closed");
+  $("sidebar-toggle").setAttribute("aria-expanded", String(!closed));
+});
+
+function closeMenu(refocus = false) {
+  show("tabs-menu", false);
+  $("tabs-menu-btn").setAttribute("aria-expanded", "false");
+  if (refocus) $("tabs-menu-btn").focus();
+}
+
+$("tabs-menu-btn").addEventListener("click", () => {
+  const open = $("tabs-menu").hidden;
+  show("tabs-menu", open);
+  $("tabs-menu-btn").setAttribute("aria-expanded", String(open));
+  if (open) $("tabs-menu").querySelector("button:not([hidden])").focus();
+});
+document.addEventListener("keydown", (e) => { if (e.key === "Escape" && !$("tabs-menu").hidden) closeMenu(true); });
+document.addEventListener("click", (e) => { if (!$("tabs-menu").hidden && !e.target.closest(".side-head")) closeMenu(); });
 
 function openTabForm(tab) {
   const f = $("tab-form");
@@ -157,7 +221,7 @@ $("tab-delete").addEventListener("click", () => runAndClose("tab-dialog", async 
 
 // ---------- owner: items ----------
 
-$("add-item").addEventListener("click", () => openItemForm({ tabId: currentTabId() }));
+$("add-item").addEventListener("click", () => openItemForm({ tabId: currentTabId() ?? tabs[0]?.id }));
 
 function openItemForm(item) {
   const f = $("item-form");
@@ -166,7 +230,7 @@ function openItemForm(item) {
   f.elements.price.value = item.price ?? "";
   f.elements.currency.value = item.currency ?? "PLN";
   f.elements.tabId.replaceChildren(...tabs.map((t) => el("option", { value: t.id }, t.name)));
-  f.elements.tabId.value = item.tabId ?? currentTabId();
+  f.elements.tabId.value = item.tabId ?? currentTabId() ?? tabs[0]?.id;
   show("item-delete", !!item.id);
   $("item-dialog").showModal();
 }
@@ -237,7 +301,9 @@ function makeDraggable(node, kind) {
     const drag = dragged;
     if (drag.kind === "item" && kind === "tab") return moveItemToTab(drag.id, node.dataset.id);
     const box = node.getBoundingClientRect();
-    const after = kind === "tab" ? e.clientX > box.left + box.width / 2 : e.clientY > box.top + box.height / 2;
+    // The tab nav is a column in the sidebar and a wrapping row of chips on phones.
+    const vertical = kind === "tab" && getComputedStyle(node.parentElement).flexDirection === "column";
+    const after = kind === "tab" && !vertical ? e.clientX > box.left + box.width / 2 : e.clientY > box.top + box.height / 2;
     reorder(drag.kind, drag.id, node.dataset.id, after);
   });
 }
@@ -245,6 +311,8 @@ function makeDraggable(node, kind) {
 function reorder(kind, movedId, targetId, after) {
   const col = kind === "tab" ? tabsCol : itemsCol;
   const moved = (kind === "tab" ? tabs : items).find((x) => x.id === movedId);
+  // In the All view an item can be dropped on an item of another tab: that is not a reorder.
+  if (kind === "item" && items.find((i) => i.id === targetId)?.tabId !== moved.tabId) return;
   const list = (kind === "tab" ? tabs : items.filter((i) => i.tabId === moved.tabId)).filter((x) => x.id !== movedId);
   const at = list.findIndex((x) => x.id === targetId) + (after ? 1 : 0);
   const prev = list[at - 1]?.order;

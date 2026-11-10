@@ -70,7 +70,7 @@ test("no price leaves the field empty and editable, and save works", async ({ pa
   await expect(popup.locator("#saved")).toBeVisible();
 
   await page.goto("/index.html?emulator#tab=have");
-  await expect(page.locator(".item h2")).toHaveText(["Scarf Fjord"]);
+  await expect(page.locator(".item h3")).toHaveText(["Scarf Fjord"]);
   await expect(page.locator(".item .price")).toContainText("120,50");
 });
 
