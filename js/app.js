@@ -116,6 +116,7 @@ function findIn(title, url) {
   const links = [];
   if (url) links.push([new URL(url).hostname.replace(/^www\./, ""), url]);
   links.push(["Ceneo", `https://www.ceneo.pl/;szukaj-${q}`]);
+  links.push(["Allegro", `https://allegro.pl/listing?string=${q}`]);
   links.push(["Google Shopping", `https://www.google.com/search?tbm=shop&q=${q}`]);
   links.forEach(([label, href], i) => {
     if (i) p.append(" · ");

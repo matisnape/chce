@@ -41,6 +41,18 @@ test("right password shows tabs and items, and a reload skips the prompt", async
   await expect(page.locator("#gate")).toBeHidden();
 });
 
+test("Znajdź w: links to an Allegro search right after Ceneo (issue #16)", async ({ page }) => {
+  await page.goto(APP);
+  await page.fill("#password", GUEST.password);
+  await page.click('#gate button[type="submit"]');
+  const links = page.locator(".item").first().locator(".find-in a");
+  await expect(links).toHaveText(["shop.example", "Ceneo", "Allegro", "Google Shopping"]);
+  const allegro = links.nth(2);
+  await expect(allegro).toHaveAttribute("href", "https://allegro.pl/listing?string=Ksi%C4%85%C5%BCka%20A");
+  await expect(allegro).toHaveAttribute("target", "_blank");
+  await expect(allegro).toHaveAttribute("rel", "noopener noreferrer");
+});
+
 test("rules: anonymous, stranger and guest writes are refused", async () => {
   expect(await asUser(null, "GET", "lists/main/tabs")).toBe(403);
 
