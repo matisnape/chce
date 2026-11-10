@@ -28,16 +28,17 @@ test("right password shows tabs and items, and a reload skips the prompt", async
   await page.goto(APP);
   await page.fill("#password", GUEST.password);
   await page.click('#gate button[type="submit"]');
-  await expect(page.locator("#tabs a")).toHaveText(["Książki", "Już mam"]);
+  await expect(page.locator("#tabs a .name")).toHaveText(["Wszystko", "Książki", "Już mam"]);
+  await expect(page.locator(".item h3")).toHaveText(["Książka A", "Książka B"]);
+  await page.click('#tabs a[data-id="books"]');
   await expect(page.locator("#tab-description")).toHaveText("Do czytania");
-  await expect(page.locator(".item h2")).toHaveText(["Książka A", "Książka B"]);
   await expect(page.locator(".item .price").first()).toContainText("49,90");
   await expect(page.locator(".find-in").first()).toContainText("shop.example");
   await expect(page.locator("#add-item")).toBeHidden();
   await expect(page.locator(".item button")).toHaveCount(0);
 
   await page.reload();
-  await expect(page.locator(".item h2").first()).toHaveText("Książka A");
+  await expect(page.locator(".item h3").first()).toHaveText("Książka A");
   await expect(page.locator("#gate")).toBeHidden();
 });
 

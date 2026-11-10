@@ -13,14 +13,18 @@ test.beforeEach(async ({ page }) => {
   await expect(page.locator("#add-item")).toBeVisible();
 });
 
-const titles = (page) => page.locator(".item h2");
+const titles = (page) => page.locator(".item h3");
+const menuItem = async (page, name) => {
+  await page.getByRole("button", { name: "Opcje zakładek" }).click();
+  await page.getByRole("menuitem", { name }).click();
+};
 
 test("owner adds a tab and an item with a Polish-formatted price", async ({ page }) => {
-  await page.click("#add-tab");
+  await menuItem(page, "Nowa zakładka");
   await page.fill('#tab-form [name="name"]', "Szafa");
   await page.fill('#tab-form [name="description"]', "Rozmiar M");
   await page.click('#tab-form button[type="submit"]');
-  await expect(page.locator('#tabs a[aria-current="page"]')).toHaveText("Szafa");
+  await expect(page.locator('#tabs a[aria-current="page"] .name')).toHaveText("Szafa");
   await expect(page.locator("#tab-description")).toHaveText("Rozmiar M");
 
   await page.click("#add-item");
@@ -48,6 +52,7 @@ test("drag reorders items and the order survives a reload and shows for guests",
 });
 
 test("dropping an item on another tab moves it there", async ({ page }) => {
+  await page.click('#tabs a[data-id="books"]');
   await page.locator(".item", { hasText: "Książka A" }).dragTo(page.locator("#tabs a", { hasText: "Już mam" }));
   await expect(titles(page)).toHaveText(["Książka B"]);
   await page.click('#tabs a:has-text("Już mam")');
@@ -55,20 +60,21 @@ test("dropping an item on another tab moves it there", async ({ page }) => {
 });
 
 test("owner edits and deletes an item; a tab with items cannot be deleted", async ({ page }) => {
-  await page.locator(".item", { hasText: "Książka B" }).getByRole("button", { name: "edytuj" }).click();
+  await page.locator(".item", { hasText: "Książka B" }).getByRole("button", { name: "Edytuj pozycję" }).click();
   await page.fill('#item-form [name="title"]', "Książka B2");
   await page.click('#item-form button[type="submit"]');
   await expect(titles(page)).toHaveText(["Książka A", "Książka B2"]);
 
   page.once("dialog", (d) => d.accept());
-  await page.locator(".item", { hasText: "Książka B2" }).getByRole("button", { name: "edytuj" }).click();
+  await page.locator(".item", { hasText: "Książka B2" }).getByRole("button", { name: "Edytuj pozycję" }).click();
   await page.click("#item-delete");
   await expect(titles(page)).toHaveText(["Książka A"]);
 
   page.once("dialog", (d) => d.accept());
-  await page.click("#edit-tab");
+  await page.click('#tabs a[data-id="books"]');
+  await menuItem(page, /Edytuj zakładkę/);
   await page.click("#tab-delete");
-  await expect(page.locator("#tabs a")).toHaveText(["Książki", "Już mam"]);
+  await expect(page.locator("#tabs a .name")).toHaveText(["Wszystko", "Książki", "Już mam"]);
 });
 
 test("rules: the owner can write", async () => {

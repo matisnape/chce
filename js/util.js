@@ -35,3 +35,10 @@ export function safeUrl(value) {
 export function nextOrder(list) {
   return list.reduce((max, x) => Math.max(max, x.order ?? 0), 0) + 1;
 }
+
+// "1 pozycja", "2 pozycje", "5 pozycji", "22 pozycje", "12 pozycji".
+export function pluralItems(n) {
+  if (n === 1) return "1 pozycja";
+  const few = n % 10 >= 2 && n % 10 <= 4 && (n % 100 < 10 || n % 100 >= 20);
+  return `${n} ${few ? "pozycje" : "pozycji"}`;
+}
