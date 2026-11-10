@@ -283,6 +283,19 @@ for (const id of ["tab-dialog", "item-dialog"]) {
   $(id).querySelector("[data-cancel]").addEventListener("click", () => $(id).close());
 }
 
+// Close the item dialog when a press starts AND ends on the backdrop.
+// Backdrop events target the <dialog> itself, so check the click lies outside its box.
+{
+  const dlg = $("item-dialog");
+  const onBackdrop = (e) => {
+    const r = dlg.getBoundingClientRect();
+    return e.target === dlg && (e.clientX < r.left || e.clientX > r.right || e.clientY < r.top || e.clientY > r.bottom);
+  };
+  let pressedOnBackdrop = false;
+  dlg.addEventListener("pointerdown", (e) => { pressedOnBackdrop = onBackdrop(e); });
+  dlg.addEventListener("click", (e) => { if (pressedOnBackdrop && onBackdrop(e)) dlg.close(); pressedOnBackdrop = false; });
+}
+
 async function submitDialog(e, dialogId, save) {
   e.preventDefault();
   await runAndClose(dialogId, () => save(e.target));
