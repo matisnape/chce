@@ -1,5 +1,5 @@
 import { GUEST_EMAIL, OWNER_UID } from "./config.js";
-import { parsePrice, formatPrice, safeUrl, nextOrder, pluralItems } from "./util.js";
+import { parsePrice, formatPrice, safeUrl, nextOrder, pluralItems, findDuplicate, duplicateText } from "./util.js";
 import { auth, fbAuth, fbStore, listRef, tabsCol, itemsCol, signInOwnerWithGoogle } from "./firebase.js";
 
 const { onAuthStateChanged, signInWithEmailAndPassword, signOut } = fbAuth;
@@ -226,6 +226,7 @@ $("add-item").addEventListener("click", () => openItemForm({ tabId: currentTabId
 function openItemForm(item) {
   const f = $("item-form");
   f.dataset.id = item.id ?? "";
+  show("dup-warning", false);
   for (const name of ["title", "url", "imageUrl", "description"]) f.elements[name].value = item[name] ?? "";
   f.elements.price.value = item.price ?? "";
   f.elements.currency.value = item.currency ?? "PLN";
@@ -235,7 +236,25 @@ function openItemForm(item) {
   $("item-dialog").showModal();
 }
 
-$("item-form").addEventListener("submit", (e) => submitDialog(e, "item-dialog", async (f) => {
+// A new item that duplicates an existing one waits for "Dodaj mimo to"; editing never warns.
+let dupConfirmed = false;
+$("item-form").addEventListener("input", () => show("dup-warning", false));
+$("dup-cancel").addEventListener("click", () => show("dup-warning", false));
+$("dup-confirm").addEventListener("click", () => { dupConfirmed = true; $("item-form").requestSubmit(); });
+
+$("item-form").addEventListener("submit", (e) => {
+  const f = e.target;
+  const confirmed = dupConfirmed;
+  dupConfirmed = false;
+  const dup = !f.dataset.id && !confirmed && findDuplicate({ url: f.elements.url.value, title: f.elements.title.value, tabId: f.elements.tabId.value }, items);
+  if (dup) {
+    e.preventDefault();
+    $("dup-warning").firstElementChild.textContent = duplicateText(dup, tabs.find((t) => t.id === dup.tabId)?.name ?? "?");
+    show("dup-warning");
+    return;
+  }
+  show("dup-warning", false);
+  submitDialog(e, "item-dialog", async (f) => {
   const v = (name) => f.elements[name].value.trim();
   const data = {
     title: v("title"),
@@ -252,7 +271,8 @@ $("item-form").addEventListener("submit", (e) => submitDialog(e, "item-dialog", 
     return updateDoc(doc(itemsCol, old.id), data);
   }
   await addDoc(itemsCol, { ...data, order: nextOrder(items.filter((i) => i.tabId === data.tabId)), createdAt: serverTimestamp() });
-}));
+  });
+});
 
 $("item-delete").addEventListener("click", () => runAndClose("item-dialog", async () => {
   if (!confirm("Usunąć pozycję?")) return;

@@ -40,6 +40,13 @@
       <label>Link do sklepu <input name="url" type="url" placeholder="https://"></label>
       <div class="actions"><button id="fetch-link" type="button">Pobierz dane z linku</button></div>
       <p id="fetch-status" role="status" hidden></p>
+      <div id="dup-warning" class="error" hidden>
+        <p></p>
+        <div class="actions">
+          <button type="button" id="dup-confirm">Dodaj mimo to</button>
+          <button type="button" class="secondary" id="dup-cancel">Anuluj</button>
+        </div>
+      </div>
       <div class="actions"><button type="submit">Zapisz</button></div>
       <p id="add-error" class="error" hidden></p>
     </form>
