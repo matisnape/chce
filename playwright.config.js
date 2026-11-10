@@ -1,12 +1,20 @@
-import { defineConfig } from "@playwright/test";
+import { defineConfig, devices } from "@playwright/test";
 
 export default defineConfig({
   testDir: "tests/e2e",
   // Tests share one emulator, so they run one at a time.
   workers: 1,
   fullyParallel: false,
-  reporter: process.env.CI ? "github" : "list",
+  // On CI the list reporter names each project in the log; the github reporter adds annotations.
+  reporter: process.env.CI ? [["github"], ["list"]] : "list",
+  // A broad break (say, WebKit only) ends with a report instead of the job timeout.
+  maxFailures: process.env.CI ? 10 : 0,
   use: { baseURL: "http://127.0.0.1:4173", headless: true },
+  // WebKit stands in for Safari, the owner's phone browser.
+  projects: [
+    { name: "chromium", use: { ...devices["Desktop Chrome"] } },
+    { name: "webkit", use: { ...devices["Desktop Safari"] } },
+  ],
   // The app (127.0.0.1:4173) and the shop fixtures (localhost:4174) are different origins, as in
   // production: the bookmarklet must work cross-origin.
   webServer: [
