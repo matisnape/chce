@@ -193,3 +193,125 @@ for (const scheme of ["light", "dark"]) {
     for (const [sel, ratio] of Object.entries(r)) expect(ratio, `${scheme} ${sel}`).toBeGreaterThanOrEqual(4.5);
   });
 }
+
+// ---- review fixes (PR 21) ----
+
+const DOCS = "http://127.0.0.1:8085/v1/projects/demo-chce/databases/(default)/documents/lists/main";
+const num = (f) => f.doubleValue ?? Number(f.integerValue);
+async function orderOf(collection) {
+  const r = await fetch(`${DOCS}/${collection}?pageSize=100`, { headers: { Authorization: "Bearer owner" } });
+  return Object.fromEntries((await r.json()).documents.map((d) => [d.name.split("/").pop(), num(d.fields.order)]));
+}
+const idsByOrder = (o) => Object.keys(o).sort((a, b) => o[a] - o[b]);
+
+test("tab drag in the desktop sidebar uses the vertical axis", async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 800 });
+  await asOwner(page);
+  const books = page.locator('#tabs a[data-id="books"]');
+  const have = page.locator('#tabs a[data-id="have"]');
+  const h = (await have.boundingBox()).height;
+  // Lower half, left side: books goes after have.
+  await books.dragTo(have, { targetPosition: { x: 10, y: h - 4 } });
+  await expect.poll(async () => idsByOrder(await orderOf("tabs"))).toEqual(["have", "books"]);
+  await expect(page.locator("#tabs a .name")).toHaveText(["Wszystko", "Już mam", "Książki"]);
+  // Upper half, right side: books goes back before have.
+  const w = (await have.boundingBox()).width;
+  await books.dragTo(have, { targetPosition: { x: w - 10, y: 4 } });
+  await expect.poll(async () => idsByOrder(await orderOf("tabs"))).toEqual(["books", "have"]);
+});
+
+// Playwright's own dragTo stalls on the phone-sized layout, so the drag events are sent directly.
+const dropTab = (page, from, to, fx, fy) => page.evaluate(({ from, to, fx, fy }) => {
+  const dt = new DataTransfer();
+  const src = document.querySelector(`#tabs a[data-id="${from}"]`);
+  const dst = document.querySelector(`#tabs a[data-id="${to}"]`);
+  const box = dst.getBoundingClientRect();
+  const init = { dataTransfer: dt, bubbles: true, cancelable: true, clientX: box.left + box.width * fx, clientY: box.top + box.height * fy };
+  src.dispatchEvent(new DragEvent("dragstart", init));
+  dst.dispatchEvent(new DragEvent("dragover", init));
+  dst.dispatchEvent(new DragEvent("drop", init));
+}, { from, to, fx, fy });
+
+test("tab drag among the phone chips uses the horizontal axis", async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await asOwner(page);
+  await dropTab(page, "books", "have", 0.9, 0.1);
+  await expect.poll(async () => idsByOrder(await orderOf("tabs"))).toEqual(["have", "books"]);
+  await expect(page.locator("#tabs a .name")).toHaveText(["Wszystko", "Już mam", "Książki"]);
+  await dropTab(page, "books", "have", 0.1, 0.9);
+  await expect.poll(async () => idsByOrder(await orderOf("tabs"))).toEqual(["books", "have"]);
+});
+
+test("keyboard: focus stays on the tab link after Enter", async ({ page }) => {
+  await asGuest(page);
+  await page.locator('#tabs a[data-id="books"]').focus();
+  await page.keyboard.press("Enter");
+  await expect(page.locator("#view-title")).toHaveText("Książki");
+  expect(await page.evaluate(() => document.activeElement.dataset.id)).toBe("books");
+});
+
+test("keyboard: focus stays on +N więcej and Mniej", async ({ page }) => {
+  for (let i = 3; i <= 7; i++) await seedDoc(`lists/main/tabs/t${i}`, { name: `Zakładka ${i}`, description: "", order: i });
+  await page.setViewportSize({ width: 390, height: 844 });
+  await asGuest(page);
+  const more = page.locator("#tabs-more");
+  await more.focus();
+  await page.keyboard.press("Enter");
+  await expect(more).toHaveText("Mniej");
+  expect(await page.evaluate(() => document.activeElement.id)).toBe("tabs-more");
+  await page.keyboard.press("Enter");
+  await expect(more).toHaveText("+4 więcej");
+  expect(await page.evaluate(() => document.activeElement.id)).toBe("tabs-more");
+});
+
+test("the password gate keeps 16px of room at 320px", async ({ page }) => {
+  await page.setViewportSize({ width: 320, height: 640 });
+  await page.goto(APP);
+  await expect(page.locator("#gate")).toBeVisible();
+  const { left, right } = await page.locator("#password").evaluate((n) => { const b = n.getBoundingClientRect(); return { left: b.left, right: innerWidth - b.right }; });
+  expect(left).toBeGreaterThanOrEqual(16);
+  expect(right).toBeGreaterThanOrEqual(16);
+});
+
+test("All view: dropping an item on an item of another tab writes nothing", async ({ page }) => {
+  await seedDoc("lists/main/items/d", { tabId: "have", title: "Rzecz D", url: null, imageUrl: null, price: null, currency: "PLN", description: "", order: 1 });
+  await asOwner(page);
+  const before = await orderOf("items");
+  await page.locator(".item", { hasText: "Książka A" }).dragTo(page.locator(".item", { hasText: "Rzecz D" }), { targetPosition: { x: 20, y: 5 } });
+  await page.waitForTimeout(500);
+  expect(await orderOf("items")).toEqual(before);
+  await expect(page.locator(".tab-section").first().locator(".item h3")).toHaveText(["Książka A", "Książka B"]);
+});
+
+test("All view: the ⋯ menu has exactly one menu item", async ({ page }) => {
+  await asOwner(page);
+  await menuButton(page).click();
+  await expect(page.getByRole("menuitem")).toHaveCount(1);
+});
+
+test("phone: an active tab past the 4th chip is visible right away", async ({ page }) => {
+  for (let i = 3; i <= 7; i++) await seedDoc(`lists/main/tabs/t${i}`, { name: `Zakładka ${i}`, description: "", order: i });
+  await page.setViewportSize({ width: 390, height: 844 });
+  await asGuest(page, `${APP}#tab=t6`);
+  await expect(page.locator("#view-title")).toHaveText("Zakładka 6");
+  await expect(page.locator('#tabs a[aria-current="page"]')).toBeVisible();
+  // Mniej still collapses while that tab stays active.
+  await page.locator("#tabs-more").click();
+  await expect(page.locator("#tabs-more")).toHaveText("+4 więcej");
+});
+
+test("phone: Bookmarklet and Wyloguj are 44px tall", async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await asOwner(page);
+  for (const sel of ["#bookmarklet-link", "#logout"]) {
+    expect((await page.locator(sel).boundingBox()).height, sel).toBeGreaterThanOrEqual(44);
+  }
+});
+
+test("desktop: the nav sits close under the Zakładki label", async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 800 });
+  await asOwner(page);
+  const label = await page.locator(".side-label").boundingBox();
+  const first = await page.locator("#tabs a").first().boundingBox();
+  expect(first.y - (label.y + label.height)).toBeLessThanOrEqual(16);
+});

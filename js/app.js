@@ -81,6 +81,7 @@ const PENCIL_ICON = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none"
 const PHONE_CHIPS = 4; // "Wszystko" counts as one; the rest hide behind "+N więcej" on narrow screens (see style.css)
 
 let moreOpen = false;
+let lastTabId;
 
 function render() {
   const tabId = currentTabId();
@@ -94,12 +95,18 @@ function render() {
     nav.push(a);
   }
   nav.find((a) => a.dataset.id === (tabId ?? "all")).setAttribute("aria-current", "page");
+  // A tab past the 4th chip opens the list when it becomes active, so it is never hidden.
+  if (tabId !== lastTabId && nav.findIndex((a) => a.dataset.id === (tabId ?? "all")) >= PHONE_CHIPS) moreOpen = true;
+  lastTabId = tabId;
   const hiddenChips = nav.length - PHONE_CHIPS;
   const more = el("button", { type: "button", id: "tabs-more", "aria-expanded": String(moreOpen) }, moreOpen ? "Mniej" : `+${hiddenChips} więcej`);
   more.hidden = hiddenChips <= 0;
   more.addEventListener("click", () => { moreOpen = !moreOpen; render(); });
   $("tabs").classList.toggle("expanded", moreOpen);
+  // Rebuilding the nav drops keyboard focus; put it back on the same control.
+  const focused = $("tabs").contains(document.activeElement) ? document.activeElement : null;
   $("tabs").replaceChildren(...nav, more);
+  if (focused) (focused.id === "tabs-more" ? more : nav.find((a) => a.dataset.id === focused.dataset.id))?.focus();
 
   const shown = tab ? [tab] : tabs;
   const shownCount = tab ? countIn(tab.id) : items.length;
@@ -294,7 +301,9 @@ function makeDraggable(node, kind) {
     const drag = dragged;
     if (drag.kind === "item" && kind === "tab") return moveItemToTab(drag.id, node.dataset.id);
     const box = node.getBoundingClientRect();
-    const after = kind === "tab" ? e.clientX > box.left + box.width / 2 : e.clientY > box.top + box.height / 2;
+    // The tab nav is a column in the sidebar and a wrapping row of chips on phones.
+    const vertical = kind === "tab" && getComputedStyle(node.parentElement).flexDirection === "column";
+    const after = kind === "tab" && !vertical ? e.clientX > box.left + box.width / 2 : e.clientY > box.top + box.height / 2;
     reorder(drag.kind, drag.id, node.dataset.id, after);
   });
 }
