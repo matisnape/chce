@@ -1,0 +1,133 @@
+<!doctype html>
+<html lang="pl">
+<head>
+<meta charset="utf-8">
+<title>C · Półka — telefon</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>
+body{margin:0}
+a:focus-visible,button:focus-visible{outline:2px solid currentColor;outline-offset:2px}
+</style>
+</helmet>
+<div style="position: relative; width: 390px; height: 844px; box-sizing: border-box; overflow: hidden; background: {{t.bg}}; color: {{t.fg}}; font-family: system-ui, -apple-system, 'Segoe UI', sans-serif; font-size: 16px; line-height: 1.5; display: flex; flex-direction: column;">
+<div style="background: {{t.side}}; border-bottom: 1px solid {{t.line}}; padding: 14px 16px 12px; display: flex; flex-direction: column; gap: 10px;">
+<div style="display: flex; align-items: center; justify-content: space-between; gap: 12px;">
+<div style="display: flex; align-items: center; gap: 10px;">
+<svg width="26" height="26" viewBox="0 0 32 32" aria-hidden="true"><rect width="32" height="32" rx="7" fill="#ff1493"></rect><g fill="#ffffff"><rect x="7" y="14" width="18" height="11" rx="1.5"></rect><rect x="6" y="10" width="20" height="5" rx="1.5"></rect></g><rect x="14.75" y="10" width="2.5" height="15" fill="#ff1493"></rect><path d="M16 10c-2-4-6-4-6-1.5S14 10 16 10zm0 0c2-4 6-4 6-1.5S18 10 16 10z" fill="none" stroke="#ffffff" stroke-width="1.8"></path></svg>
+<span style="font-family: ui-serif, Georgia, 'Times New Roman', serif; font-size: 22px; font-weight: 600;">chce</span>
+</div>
+<div style="display: flex; align-items: center; gap: 16px; font-size: 14px; color: {{t.muted}};">
+<a href="#" style="color: {{t.muted}}; text-underline-offset: 3px; padding: 12px 0;">Bookmarklet</a>
+<button type="button" style="height: 44px; padding: 0; border: 0; background: transparent; color: {{t.muted}}; font: inherit; text-decoration: underline; text-underline-offset: 3px;">Wyloguj</button>
+</div>
+</div>
+<div style="position: relative; display: flex; align-items: center; gap: 4px;">
+<nav aria-label="Zakładki" style="flex: 1 1 auto; min-width: 0; display: flex; gap: 6px; overflow-x: auto;">
+<sc-for list="{{nav}}" as="n" hint-placeholder-count="3">
+<button type="button" aria-current="{{n.ariaCurrent}}" onClick="{{n.select}}" style="flex: 0 0 auto; display: inline-flex; align-items: center; gap: 6px; height: 44px; padding: 0 14px; border: 0; border-radius: 8px; background: {{n.bg}}; color: {{n.fg}}; font: inherit; font-weight: {{n.weight}}; font-size: 15px;">{{n.name}} <span style="font-weight: 500; font-size: 13px;">{{n.count}}</span></button>
+</sc-for>
+</nav>
+<button type="button" aria-label="Opcje zakładek" aria-haspopup="menu" aria-expanded="{{menuExpanded}}" onClick="{{toggleMenu}}" style="flex: 0 0 44px; width: 44px; height: 44px; border-radius: 8px; border: 0; background: transparent; color: {{t.muted}}; display: flex; align-items: center; justify-content: center;">
+<svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="5" cy="12" r="1.6"></circle><circle cx="12" cy="12" r="1.6"></circle><circle cx="19" cy="12" r="1.6"></circle></svg>
+</button>
+<sc-if value="{{menuOpen}}" hint-placeholder-val="{{false}}">
+<div role="menu" style="position: absolute; top: 50px; right: 0; z-index: 3; min-width: 230px; padding: 6px; border-radius: 12px; background: {{t.surface}}; border: 1px solid {{t.line}}; box-shadow: 0 8px 24px rgb(0 0 0 / 0.25); display: flex; flex-direction: column;">
+<sc-if value="{{singleTab}}" hint-placeholder-val="{{false}}">
+<button type="button" role="menuitem" style="height: 44px; padding: 0 12px; border: 0; border-radius: 8px; background: transparent; color: {{t.fg}}; font: inherit; font-size: 15px; text-align: left;">Edytuj zakładkę „{{title}}”</button>
+</sc-if>
+<button type="button" role="menuitem" style="height: 44px; padding: 0 12px; border: 0; border-radius: 8px; background: transparent; color: {{t.fg}}; font: inherit; font-size: 15px; text-align: left;">Nowa zakładka</button>
+</div>
+</sc-if>
+</div>
+</div>
+<main style="flex: 1 1 auto; min-height: 0; overflow-y: auto; padding: 20px 16px 96px; display: flex; flex-direction: column; gap: 24px;">
+<div style="display: flex; align-items: baseline; justify-content: space-between; gap: 12px;">
+<h1 style="margin: 0; font-family: ui-serif, Georgia, 'Times New Roman', serif; font-size: 30px; font-weight: 600; line-height: 1.2;">{{title}}</h1>
+<span style="font-size: 14px; color: {{t.muted}};">{{countLabel}}</span>
+</div>
+<sc-for list="{{sections}}" as="s" hint-placeholder-count="2">
+<section style="display: flex; flex-direction: column; gap: 12px;">
+<sc-if value="{{showHeads}}" hint-placeholder-val="{{true}}">
+<div style="display: flex; align-items: baseline; gap: 10px; border-top: 1px solid {{t.line}}; padding-top: 12px;">
+<h2 style="margin: 0; font-family: ui-serif, Georgia, 'Times New Roman', serif; font-size: 20px; font-weight: 600;">{{s.name}}</h2>
+<span style="font-size: 13px; color: {{t.muted}};">{{s.countLabel}}</span>
+</div>
+</sc-if>
+<ul style="list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 12px;">
+<sc-for list="{{s.items}}" as="item" hint-placeholder-count="2">
+<li style="display: flex; gap: 14px; padding: 12px; border-radius: 14px; background: {{t.surface}}; border: 1px solid {{t.line}}; min-width: 0;">
+<div style="flex: 0 0 88px; height: 88px; border-radius: 10px; background: {{t.tile}}; color: #8a8285; display: flex; align-items: center; justify-content: center;">
+<svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2"></rect><circle cx="9" cy="10" r="1.6"></circle><path d="M21 16l-5-5-8 8"></path></svg>
+</div>
+<div style="flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 2px;">
+<h3 style="margin: 0; font-size: 15px; font-weight: 600; line-height: 1.35;"><a href="{{item.url}}" style="color: {{t.fg}}; text-decoration: none;">{{item.title}}</a></h3>
+<span style="font-size: 15px; font-weight: 600; font-variant-numeric: tabular-nums;">{{item.price}}</span>
+<p style="margin: 4px 0 0; font-size: 13px; line-height: 1.6; color: {{t.muted}};">Znajdź w: <a href="{{item.url}}" style="color: {{t.muted}}; text-underline-offset: 3px;">{{item.shop}}</a> · <a href="{{item.ceneo}}" style="color: {{t.muted}}; text-underline-offset: 3px;">Ceneo</a> · <a href="{{item.allegro}}" style="color: {{t.muted}}; text-underline-offset: 3px;">Allegro</a> · <a href="{{item.google}}" style="color: {{t.muted}}; text-underline-offset: 3px;">Google Shopping</a></p>
+</div>
+<button type="button" aria-label="Edytuj pozycję" style="flex: 0 0 44px; height: 44px; margin: -8px -8px 0 0; border-radius: 8px; border: 0; background: transparent; color: {{t.muted}}; display: flex; align-items: center; justify-content: center;">
+<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" aria-hidden="true"><path d="M4 20h4L19 9l-4-4L4 16v4z"></path><path d="M13.5 6.5l4 4"></path></svg>
+</button>
+</li>
+</sc-for>
+</ul>
+</section>
+</sc-for>
+</main>
+<button type="button" style="position: absolute; right: 16px; bottom: 16px; height: 56px; padding: 0 22px 0 16px; border-radius: 999px; border: 0; background: {{t.acc}}; color: {{t.onAcc}}; font: inherit; font-size: 16px; font-weight: 600; display: flex; align-items: center; gap: 8px; box-shadow: 0 6px 20px rgb(0 0 0 / 0.28);">
+<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"></path></svg>
+Dodaj
+</button>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"dark":{"editor":"boolean","default":true},"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+renderVals() {
+const P = {
+light: { bg: '#fbf7f8', side: '#f3ecef', surface: '#ffffff', tile: '#f6f2f3', fg: '#221c1f', muted: '#6b6466', line: '#eadfe4', acc: '#b33c72', onAcc: '#ffffff', chipBg: '#f6e4ec', chipFg: '#7d2f52' },
+dark: { bg: '#171516', side: '#201d1f', surface: '#221f21', tile: '#ece7e9', fg: '#f2ecef', muted: '#a9a1a4', line: '#352f32', acc: '#f0a6c8', onAcc: '#171516', chipBg: '#3b2a32', chipFg: '#f3d5e2' }
+};
+const t = (this.props.dark ?? true) ? P.dark : P.light;
+const links = (i) => {
+const q = encodeURIComponent(i.title);
+return { ...i, ceneo: 'https://www.ceneo.pl/;szukaj-' + q, allegro: 'https://allegro.pl/listing?string=' + q, google: 'https://www.google.com/search?tbm=shop&q=' + q };
+};
+const tabs = [
+{ id: 'przyklad', name: 'Przykład', items: [
+{ title: 'Książka A', price: '49,99 zł', shop: 'shop.example', url: 'https://shop.example/' },
+{ title: 'Kubek z długą nazwą, żeby sprawdzić zawijanie tytułu', price: '29,00 €', shop: 'sklep.example', url: 'https://sklep.example/' }
+].map(links) },
+{ id: 'other', name: '[Druga zakładka]', items: [
+{ title: '[Pozycja]', price: '[cena]', shop: '[sklep]', url: '#' }
+].map(links) }
+];
+const plural = (n) => n === 1 ? '1 pozycja' : (n % 10 >= 2 && n % 10 <= 4 && (n % 100 < 10 || n % 100 >= 20)) ? n + ' pozycje' : n + ' pozycji';
+const s = this.state || {};
+const view = s.view || 'all';
+const menuOpen = !!s.menuOpen;
+const total = tabs.reduce((a, x) => a + x.items.length, 0);
+const navSrc = [{ id: 'all', name: 'Wszystko', count: total }].concat(tabs.map((x) => ({ id: x.id, name: x.name, count: x.items.length })));
+const nav = navSrc.map((n) => {
+const on = n.id === view;
+return { ...n, ariaCurrent: on ? 'page' : 'false', bg: on ? t.chipBg : 'transparent', fg: on ? t.chipFg : t.fg, weight: on ? 600 : 400, select: () => this.setState({ view: n.id, menuOpen: false }) };
+});
+const shown = view === 'all' ? tabs : tabs.filter((x) => x.id === view);
+const sections = shown.map((x) => ({ ...x, countLabel: plural(x.items.length) }));
+const current = tabs.find((x) => x.id === view);
+return {
+t, nav, sections,
+title: current ? current.name : 'Wszystko',
+countLabel: plural(shown.reduce((a, x) => a + x.items.length, 0)),
+showHeads: view === 'all',
+singleTab: view !== 'all',
+menuOpen, menuExpanded: menuOpen ? 'true' : 'false',
+toggleMenu: () => this.setState({ menuOpen: !menuOpen })
+};
+}
+}
+</script>
+</body>
+</html>
