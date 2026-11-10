@@ -35,6 +35,9 @@ same("https://shop.pl/p#opinie", "https://shop.pl/p");
 same("https://shop.pl/p/", "https://shop.pl/p");
 same("https://shop.pl/", "https://shop.pl");
 same("https://shop.pl/p?id=7&utm_source=x", "https://shop.pl/p?id=7");
+same("https://shop.pl/s?f=a,b&q=a%20b&utm_source=x", "https://shop.pl/s?f=a,b&q=a%20b");
+assert.equal(normalizeUrl("javascript:alert(1)"), "");
+assert.equal(normalizeUrl("mailto:a@b.pl"), "");
 differ("https://shop.pl/p?id=7", "https://shop.pl/p?id=8");
 differ("https://shop.pl/p?id=7", "https://shop.pl/p");
 assert.equal(normalizeUrl(""), "");
@@ -48,4 +51,5 @@ assert.equal(findDuplicate({ tabId: "t2", title: "x", url: "https://www.shop.pl/
 assert.equal(findDuplicate({ tabId: "t1", title: " zeszyt ", url: "" }, items).id, "2");
 assert.equal(findDuplicate({ tabId: "t2", title: "Zeszyt", url: "" }, items), undefined);
 assert.equal(findDuplicate({ tabId: "t1", title: "Lampa", url: "" }, items), undefined);
+assert.equal(findDuplicate({ tabId: "t1", title: "Zeszyt", url: "mailto:a@b.pl" }, items)?.id, "2");
 console.log("duplicates ok");

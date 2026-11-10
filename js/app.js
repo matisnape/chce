@@ -239,7 +239,7 @@ function openItemForm(item) {
 // A new item that duplicates an existing one waits for "Dodaj mimo to"; editing never warns.
 let dupConfirmed = false;
 $("item-form").addEventListener("input", () => show("dup-warning", false));
-$("dup-cancel").addEventListener("click", () => show("dup-warning", false));
+$("dup-cancel").addEventListener("click", () => { show("dup-warning", false); $("item-form").querySelector('button[type="submit"]').focus(); });
 $("dup-confirm").addEventListener("click", () => { dupConfirmed = true; $("item-form").requestSubmit(); });
 
 $("item-form").addEventListener("submit", (e) => {
@@ -251,6 +251,7 @@ $("item-form").addEventListener("submit", (e) => {
     e.preventDefault();
     $("dup-warning").firstElementChild.textContent = duplicateText(dup, tabs.find((t) => t.id === dup.tabId)?.name ?? "?");
     show("dup-warning");
+    $("dup-confirm").focus();
     return;
   }
   show("dup-warning", false);

@@ -27,8 +27,11 @@ test("dialog: duplicate link warns with the tab name; cancel keeps the form and 
   await fillDialog(page, "Kopia", DUP_LINK);
   await expect(warning(page)).toBeVisible();
   await expect(warning(page)).toContainText("Książki");
+  await expect(warning(page)).toHaveAttribute("role", "alert");
+  await expect(page.locator("#dup-confirm")).toBeFocused();
   await page.click("#dup-cancel");
   await expect(warning(page)).toBeHidden();
+  await expect(page.locator('#item-form button[type="submit"]')).toBeFocused();
   await expect(page.locator("#item-dialog")).toBeVisible();
   await expect(page.locator('#item-form [name="title"]')).toHaveValue("Kopia");
   expect(await listIds("items")).toHaveLength(3);
@@ -68,8 +71,11 @@ test("add popup: duplicate link shows the same warning and choices", async ({ pa
   await expect(page.locator("#add-form")).toBeVisible();
   await page.click('#add-form button[type="submit"]');
   await expect(warning(page)).toContainText("Książki");
+  await expect(warning(page)).toHaveAttribute("role", "alert");
+  await expect(page.locator("#dup-confirm")).toBeFocused();
   expect(await listIds("items")).toHaveLength(3);
   await page.click("#dup-cancel");
+  await expect(page.locator('#add-form button[type="submit"]')).toBeFocused();
   await expect(page.locator('#add-form [name="title"]')).toHaveValue("Kopia");
   await page.click('#add-form button[type="submit"]');
   await page.click("#dup-confirm");

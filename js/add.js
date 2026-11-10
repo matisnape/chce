@@ -122,7 +122,7 @@ let running = null; // AbortController of the fetch in flight, if any
 
 let dupConfirmed = false;
 form.addEventListener("input", () => show("dup-warning", false));
-$("dup-cancel").addEventListener("click", () => show("dup-warning", false));
+$("dup-cancel").addEventListener("click", () => { show("dup-warning", false); saveBtn.focus(); });
 $("dup-confirm").addEventListener("click", () => { dupConfirmed = true; form.requestSubmit(); });
 
 form.addEventListener("submit", async (e) => {
@@ -143,6 +143,7 @@ form.addEventListener("submit", async (e) => {
       $("dup-warning").firstElementChild.textContent = duplicateText(dup, tabName);
       show("dup-warning");
       saveBtn.disabled = fetchBtn.disabled = false;
+      $("dup-confirm").focus();
       return;
     }
     const inTab = all.filter((i) => i.tabId === tabId);

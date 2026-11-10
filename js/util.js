@@ -47,10 +47,11 @@ export function pluralItems(n) {
 // dropped, trailing "/" dropped. Other query parameters stay (shops put product ids there).
 // Empty or unreadable gives "".
 export function normalizeUrl(value) {
-  let u;
-  try { u = new URL(value); } catch { return ""; }
+  if (!safeUrl(value)) return ""; // what is not saved as a link is not a link
+  const u = new URL(value);
   for (const k of [...u.searchParams.keys()]) if (/^(utm_|gclid$|fbclid$)/i.test(k)) u.searchParams.delete(k);
-  return `${u.protocol}//${u.host.replace(/^www\./, "")}${u.pathname.replace(/\/$/, "")}${u.search}`;
+  const q = String(u.searchParams); // always re-serialised, so a dropped param cannot change the encoding of the rest
+  return `${u.protocol}//${u.host.replace(/^www\./, "")}${u.pathname.replace(/\/$/, "")}${q ? "?" + q : ""}`;
 }
 
 // The existing item a new {url, title, tabId} duplicates, or undefined. Two links compare normalised,
