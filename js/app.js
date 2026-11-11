@@ -151,15 +151,16 @@ function itemCard(item) {
   body.append(el("h3", {}, url ? el("a", { href: url, rel: "noopener noreferrer", target: "_blank" }, item.title) : item.title));
   if (item.price != null && item.price !== "") body.append(el("p", { class: "price" }, formatPrice(item.price, item.currency)));
   if (item.description) body.append(el("p", { class: "description" }, item.description));
-  body.append(findIn(item.title, url));
-  if (item.owned) body.append(el("span", { class: "owned-label" }, OWNED_NAME));
+  const foot = el("div", { class: "item-foot" }, findIn(item.title, url));
+  body.append(foot);
+  if (item.owned) foot.append(el("span", { class: "owned-label" }, OWNED_NAME));
+  else if (isOwner) {
+    const own = el("button", { type: "button", class: "item-own" }, OWNED_NAME);
+    own.addEventListener("click", () => runAndClose(null, () => updateDoc(doc(itemsCol, item.id), { owned: true })));
+    foot.append(own);
+  }
   li.append(body);
   if (isOwner) {
-    if (!item.owned) {
-      const own = el("button", { type: "button", class: "secondary item-own" }, OWNED_NAME);
-      own.addEventListener("click", () => runAndClose(null, () => updateDoc(doc(itemsCol, item.id), { owned: true })));
-      li.append(own);
-    }
     const edit = el("button", { type: "button", class: "icon-btn item-edit", "aria-label": "Edytuj pozycję" });
     edit.insertAdjacentHTML("beforeend", PENCIL_ICON);
     edit.addEventListener("click", () => openItemForm(item));
