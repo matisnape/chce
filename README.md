@@ -1,12 +1,17 @@
 # chce.to
-## iPhone share-sheet shortcut
+## iPhone share-sheet shortcuts
 
-`chce.shortcut` fetches `js/shortcut.js` from the published site at run time, so a fix to `js/extract.js` reaches it after a deploy. After changing `js/extract.js`:
+Both are built by `scripts/build-shortcut.mjs` from the same `js/shortcut.js` (itself generated from `js/extract.js`) and signed with `shortcuts sign --mode anyone`.
+
+- `chce.shortcut` ("chce", daily use): the script is pasted into the Run JavaScript action as a literal. No code is fetched at run time. After any change to `js/extract.js` it must be re-downloaded and re-imported on the phone.
+- `chce-dev.shortcut` ("chce-dev", for testing): fetches `https://anks.pl/chce/js/shortcut.js` at run time, so a deploy reaches it with no re-import.
+
+Rebuild after changing `js/extract.js` or the build script:
 
 ```sh
-node scripts/build-shortcut.mjs                 # rewrites js/shortcut.js (a unit test fails when it is stale)
-node scripts/build-shortcut.mjs /tmp/chce.plist # only when the shortcut's own actions change
-shortcuts sign --mode anyone --input /tmp/chce.plist --output chce.shortcut
+node scripts/build-shortcut.mjs /tmp/chce-build        # rewrites js/shortcut.js; the directory must exist, gets chce.plist and chce-dev.plist
+shortcuts sign --mode anyone --input /tmp/chce-build/chce.plist --output chce.shortcut
+shortcuts sign --mode anyone --input /tmp/chce-build/chce-dev.plist --output chce-dev.shortcut
 ```
 
-`chce.shortcut` is a signed copy of the plist `buildPlist()` returns: rebuild and re-sign it whenever `scripts/build-shortcut.mjs` changes its actions. No CI check covers this (the `aea` tool is not on Ubuntu), so a stale `chce.shortcut` is caught only by review.
+`npm run test:unit` fails when `js/shortcut.js` is stale. On macOS it also opens both signed files and fails when they differ from the build. CI skips that part (no `aea` on Ubuntu), so re-sign before pushing.

@@ -1,7 +1,9 @@
 // Builds the iPhone share-sheet shortcut's two parts from the tested code.
 //   node scripts/build-shortcut.mjs            rewrites js/shortcut.js (script the shortcut fetches at run time)
-//   node scripts/build-shortcut.mjs <out.plist> also writes the unsigned shortcut, to sign with
-//     shortcuts sign --mode anyone --input <out.plist> --output chce.shortcut
+//   node scripts/build-shortcut.mjs <dir>      also writes <dir>/chce.plist and <dir>/chce-dev.plist, to sign with
+//     shortcuts sign --mode anyone --input <dir>/chce.plist --output chce.shortcut   (same for chce-dev)
+// Two shortcuts: "chce" carries the script as a literal (daily use, no network fetch of code);
+// "chce-dev" fetches js/shortcut.js from the site at run time (picks up changes without re-import).
 // js/shortcut.js is generated from js/extract.js; tests/shortcut.test.mjs fails when they drift.
 import { writeFileSync } from "node:fs";
 import { extract } from "../js/extract.js";
@@ -26,16 +28,19 @@ const tokenString = (before, name, id) => ({
 });
 const action = (name, params) => ({ WFWorkflowActionIdentifier: `is.workflow.actions.${name}`, WFWorkflowActionParameters: params });
 
-export function buildPlist() {
+export function buildPlist(kind = "embedded") {
+  const dev = kind === "dev";
   return {
     WFWorkflowActions: [
-      action("downloadurl", { UUID: uuid.fetch, WFURL: `${SITE}js/shortcut.js` }),
-      // Get Text from Input: turns the downloaded file into plain text, as the Shortcuts app does itself.
-      action("detect.text", { UUID: uuid.text }),
+      ...(dev ? [
+        action("downloadurl", { UUID: uuid.fetch, WFURL: `${SITE}js/shortcut.js` }),
+        // Get Text from Input: turns the downloaded file into plain text, as the Shortcuts app does itself.
+        action("detect.text", { UUID: uuid.text }),
+      ] : []),
       action("runjavascriptonwebpage", {
         UUID: uuid.run,
         WFInput: { Value: { Type: "ExtensionInput" }, WFSerializationType: "WFTextTokenAttachment" },
-        WFJavaScript: tokenString("", "Text", uuid.text),
+        WFJavaScript: dev ? tokenString("", "Text", uuid.text) : buildScript(),
       }),
       action("openurl", { WFInput: tokenString(`${SITE}add.html#`, "JavaScript Result", uuid.run) }),
     ],
@@ -59,10 +64,14 @@ function xml(v, pad) {
   const rows = Object.entries(v).map(([k, x]) => `${pad}\t<key>${esc(k)}</key>\n${pad}\t${xml(x, pad + "\t")}`);
   return `<dict>\n${rows.join("\n")}\n${pad}</dict>`;
 }
-export const plistXml = () =>
-  `<?xml version="1.0" encoding="UTF-8"?>\n<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">\n<plist version="1.0">\n${xml(buildPlist(), "")}\n</plist>\n`;
+export const plistXml = (kind) =>
+  `<?xml version="1.0" encoding="UTF-8"?>\n<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">\n<plist version="1.0">\n${xml(buildPlist(kind), "")}\n</plist>\n`;
 
 if (process.argv[1] === new URL(import.meta.url).pathname) {
   writeFileSync(new URL("../js/shortcut.js", import.meta.url), buildScript());
-  if (process.argv[2]) writeFileSync(process.argv[2], plistXml());
+  const dir = process.argv[2];
+  if (dir) {
+    writeFileSync(`${dir}/chce.plist`, plistXml("embedded"));
+    writeFileSync(`${dir}/chce-dev.plist`, plistXml("dev"));
+  }
 }

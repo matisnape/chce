@@ -83,6 +83,6 @@ test("bookmarklet.html hands out the shortcut with Polish setup steps", async ({
   await expect(link).toHaveAttribute("href", "chce.shortcut");
   await expect(page.locator("#shortcut-steps")).toContainText("iCloud");
   await expect(page.locator("#shortcut-steps")).toContainText("Allow Running Scripts");
-  const res = await page.request.get("/chce.shortcut");
-  expect(res.ok()).toBe(true);
+  await expect(page.locator("a#shortcut-dev")).toHaveAttribute("href", "chce-dev.shortcut");
+  for (const f of ["chce.shortcut", "chce-dev.shortcut"]) expect((await page.request.get(`/${f}`)).ok()).toBe(true);
 });
