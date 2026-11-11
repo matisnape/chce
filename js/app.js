@@ -237,10 +237,10 @@ function openItemForm(item) {
   itemFetch.reset();
   show("item-images", false);
   show("item-fetch-row", !item.id); // the fetch button is for creating only
-  // Phone width (the 799px breakpoint of style.css): the link comes first, then the fetch button, then the title.
+  // Phone width (the 799px breakpoint of style.css): the link comes first, then the fetch button and its status, then the title.
   // The title label is moved in the DOM, not with CSS `order`, so reading and Tab order match the drawing.
   const title = f.elements.title.closest("label");
-  if (matchMedia("(max-width: 799px)").matches) f.elements.imageUrl.closest("label").before(title);
+  if (matchMedia("(max-width: 799px)").matches) $("item-fetch-status").after(title);
   else f.querySelector("h2").after(title);
   $("item-dialog").showModal();
 }

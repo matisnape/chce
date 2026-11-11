@@ -30,6 +30,10 @@ test("phone, new item: link first and focused, Tab reaches the fetch button, the
   expect(await focusedName(page)).toBe("item-fetch");
   await page.keyboard.press(tab);
   expect(await focusedName(page)).toBe("title");
+  // The title sits right under the status line; the picker stays directly before "Link do zdjęcia", which it writes to.
+  const next = (id) => page.evaluate((i) => document.getElementById(i).nextElementSibling.querySelector("input")?.name, id);
+  expect(await next("item-fetch-status")).toBe("title");
+  expect(await next("item-images")).toBe("imageUrl");
 });
 
 test("phone, edit: link first and focused", async ({ page }) => {
@@ -59,4 +63,14 @@ test("resizing across 800px while the dialog is closed: the next open matches th
   await page.click("#add-item");
   expect(await focusedName(page)).toBe("url");
   await expect(field(page, "title")).toBeVisible();
+});
+
+test("the 800px boundary: 799 wide puts the link first, 800 wide keeps the title first", async ({ page }) => {
+  for (const [width, first] of [[799, "url"], [800, "title"]]) {
+    await page.setViewportSize({ width, height: 844 });
+    await page.click("#add-item");
+    expect(await focusedName(page)).toBe(first);
+    expect(await firstField(page)).toBe(first);
+    await page.keyboard.press("Escape");
+  }
 });
