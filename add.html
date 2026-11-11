@@ -24,6 +24,7 @@
     </section>
 
     <form id="add-form" hidden>
+      <button type="button" id="add-close" class="close" aria-label="Zamknij">✕</button>
       <h1>Dodaj do chce</h1>
       <label>Zakładka <select name="tabId" required></select></label>
       <label>Tytuł <input name="title" required maxlength="200"></label>
@@ -47,7 +48,10 @@
           <button type="button" class="secondary" id="dup-cancel">Anuluj</button>
         </div>
       </div>
-      <div class="actions"><button type="submit">Zapisz</button></div>
+      <div class="actions">
+        <button type="submit">Zapisz</button>
+        <button type="button" class="secondary" id="add-cancel">Anuluj</button>
+      </div>
       <p id="add-error" class="error" hidden></p>
     </form>
 

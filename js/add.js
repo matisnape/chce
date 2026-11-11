@@ -66,6 +66,17 @@ const fetcher = setupLinkFetch({
   afterFill: () => { show("saved", false); show("add-form"); },
 });
 
+// Leave without saving. A popup (the bookmarklet's window) closes itself; Safari refuses to close a
+// tab it did not open, so everything else goes to the list. Navigation drops an in-flight fetch
+// with the page; the popup path aborts it explicitly because the window may outlive the click.
+const leave = () => {
+  fetcher.cancel("left");
+  if (new URLSearchParams(location.search).has("popup")) window.close();
+  else location.href = `./${EMULATOR ? "?emulator" : ""}`;
+};
+$("add-cancel").addEventListener("click", leave);
+$("add-close").addEventListener("click", leave);
+
 let dupConfirmed = false;
 form.addEventListener("input", () => show("dup-warning", false));
 $("dup-cancel").addEventListener("click", () => { show("dup-warning", false); saveBtn.focus(); });
