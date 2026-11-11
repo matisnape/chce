@@ -31,6 +31,10 @@ $("owner-login").addEventListener("click", () => signInOwnerWithGoogle().catch((
   show("signin-error");
 }));
 
+// A second share into this open tab changes only the hash (same-document navigation). Reloading
+// resets the form, saved notice, duplicate warning, fetch status and images in one step.
+addEventListener("hashchange", () => location.reload());
+
 // The hash comes from whatever page the bookmarklet ran on, so this is the only guard on it:
 // keep known fields of the right type and length. The description is never taken from it.
 function readHash() {
