@@ -87,6 +87,38 @@ for (const [code, text] of [[401, "Sesja wygasła"], [403, "nie może pobierać"
   });
 }
 
+// The Worker puts the shop's own status in the 502 body; the message follows it.
+for (const [upstream, text] of [
+  [421, "nie wpuszcza serwera chce (kod 421)"], [403, "nie wpuszcza serwera chce (kod 403)"], [429, "nie wpuszcza serwera chce (kod 429)"],
+  [404, "nie ma takiej strony"], [0, "nie odpowiedział na czas"],
+]) {
+  test(`Worker 502 with shop status ${upstream}: the message says what to do`, async ({ page }) => {
+    await stub(page, json(502, { error: "fetch_failed", status: upstream }));
+    await openAdd(page);
+    await paste(page);
+    await fetchBtn(page).click();
+    await expect(status(page)).toContainText(text);
+    await expect(status(page)).not.toContainText("blokować boty");
+    await expect(fetchBtn(page)).toBeEnabled();
+  });
+}
+
+test("Worker 502 with a refusing shop points to the bookmarklet", async ({ page }) => {
+  await stub(page, json(502, { error: "fetch_failed", status: 421 }));
+  await openAdd(page);
+  await paste(page);
+  await fetchBtn(page).click();
+  await expect(status(page)).toContainText("zakładki");
+});
+
+test("Worker 502 with a non-JSON body keeps the generic message", async ({ page }) => {
+  await stub(page, (route) => route.fulfill({ status: 502, headers: CORS, contentType: "text/html", body: "<h1>Bad gateway</h1>" }).catch(() => {}));
+  await openAdd(page);
+  await paste(page);
+  await fetchBtn(page).click();
+  await expect(status(page)).toContainText("blokować boty");
+});
+
 test("a network failure shows a message and the form still saves by hand", async ({ page }) => {
   await stub(page, (route) => route.abort());
   await openAdd(page);
