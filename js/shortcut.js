@@ -74,5 +74,5 @@
     images,
   };
 })(document); } catch (e) {}
-  completion(JSON.stringify(d));
+  completion(encodeURIComponent(JSON.stringify(d)));
 })();
