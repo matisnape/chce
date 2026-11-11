@@ -16,6 +16,26 @@ const WORKER_ERRORS = {
   503: "Usługa chwilowo niedostępna. Spróbuj za chwilę albo wpisz dane ręcznie.",
 };
 
+// A 502 carries the shop's own status in its body ({ error: "fetch_failed", status: N }); the text
+// follows it. A missing or unreadable body keeps the generic WORKER_ERRORS[502].
+function shopRefusal(status) {
+  if ([403, 421, 429].includes(status)) {
+    return `Sklep nie wpuszcza serwera chce (kod ${status}). Otwórz stronę produktu i użyj zakładki 🎁 chce albo wpisz dane ręcznie.`;
+  }
+  if (status === 404) return "Sklep zgłasza, że nie ma takiej strony. Sprawdź link albo wpisz dane ręcznie.";
+  if (status === 0) return "Sklep nie odpowiedział na czas. Spróbuj jeszcze raz albo wpisz dane ręcznie.";
+  return null;
+}
+
+async function workerError(res) {
+  if (res.status === 502) {
+    const body = await res.json().catch(() => null);
+    const text = body?.error === "fetch_failed" && Number.isInteger(body.status) ? shopRefusal(body.status) : null;
+    if (text) return text;
+  }
+  return WORKER_ERRORS[res.status] ?? `Nie udało się pobrać danych (błąd ${res.status}). Wpisz dane ręcznie.`;
+}
+
 // Same guard for every source of page data (hash, Worker): known fields, right type and length.
 export function clean(d) {
   const str = (v, max) => (typeof v === "string" ? v.slice(0, max) : "");
@@ -117,7 +137,12 @@ export function setupLinkFetch({ form, button, images, custom, note, busy = () =
         signal: ctl.signal,
       });
       ctl.signal.throwIfAborted();
-      if (!res.ok) { note(WORKER_ERRORS[res.status] ?? `Nie udało się pobrać danych (błąd ${res.status}). Wpisz dane ręcznie.`, true); return; }
+      if (!res.ok) {
+        const text = await workerError(res);
+        ctl.signal.throwIfAborted(); // saved or closed while the body was read
+        note(text, true);
+        return;
+      }
       const got = clean(await res.json());
       ctl.signal.throwIfAborted();
       if (!got.title && !got.price && !got.images.length) { note("Nic nie znaleziono na tej stronie. Wpisz dane ręcznie.", true); return; }
