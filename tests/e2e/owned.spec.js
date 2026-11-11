@@ -114,6 +114,8 @@ test.describe("pill placement on a phone", () => {
     expect(p.height).toBeGreaterThanOrEqual(minHeight);
     expect(await pill.evaluate((e) => getComputedStyle(e).backgroundColor)).toBe(await chipBg(page));
     // wrap: the title spans the pill's x-range, above it, so no full-height column is reserved
+    const fontSize = (loc) => loc.evaluate((e) => parseFloat(getComputedStyle(e).fontSize));
+    expect(await fontSize(card.locator(".find-in"))).toBeLessThan(await fontSize(card.locator("h3")));
     const t = await box(card.locator("h3"));
     expect(t.right).toBeGreaterThan(p.left);
     expect(t.bottom).toBeLessThanOrEqual(p.top);

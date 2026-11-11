@@ -89,6 +89,7 @@ dialog label.check { display: flex; align-items: center; gap: 8px; }
 .description { margin: 0; font-size: .875rem; white-space: pre-line; }
 .item-foot { margin-top: auto; display: flex; align-items: flex-end; justify-content: space-between; gap: 8px; }
 .item-foot .find-in { margin: 0; min-width: 0; }
+.find-in { color: var(--muted); font-size: .8rem; line-height: 1.6; }
 .find-in a { color: var(--muted); text-underline-offset: 3px; }
 .item-edit { position: absolute; top: 8px; right: 8px; }
 body.owner .item h3 { padding-right: 32px; }
