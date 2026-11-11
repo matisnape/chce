@@ -108,6 +108,13 @@ test("shop answering 403 gives 502", async () => {
   assert.deepEqual(await res.json(), { error: "fetch_failed", status: 403 });
 });
 
+test("shop answering 421 gives 502 with that status", async () => {
+  const refusedHere = async () => { throw new FetchError(421); };
+  const res = await post(handler(refusedHere), await token());
+  assert.equal(res.status, 502);
+  assert.deepEqual(await res.json(), { error: "fetch_failed", status: 421 });
+});
+
 test("localhost, IP literals and non-http targets give 400", async () => {
   const never = async () => assert.fail("must not fetch");
   const tok = await token();

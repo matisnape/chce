@@ -85,6 +85,15 @@ test("Worker 502: the add popup's Polish message shows and the dialog still save
   expect(await listIds("items")).toHaveLength(3);
 });
 
+test("Worker 502 with a refusing shop: the dialog shows the same shop-refused message", async ({ page }) => {
+  await stub(page, (route) => fulfill(route, 502, { error: "fetch_failed", status: 421 }));
+  await openAndPaste(page);
+  await fetchBtn(page).click();
+  await expect(status(page)).toContainText("nie wpuszcza serwera chce (kod 421)");
+  await expect(status(page)).toContainText("zakładki");
+  await expect(fetchBtn(page)).toBeEnabled();
+});
+
 test("editing an existing item shows no fetch button", async ({ page }) => {
   await page.locator(".item-edit").first().click();
   await expect(page.locator("#item-dialog")).toBeVisible();
