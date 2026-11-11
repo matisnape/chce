@@ -12,6 +12,10 @@ const show = (id, on = true) => { $(id).hidden = !on; };
 let isOwner = false;
 let tabs = [];
 let items = [];
+// "Już mam" is a view of the items flagged `owned`, not a tab; the item keeps its own tabId.
+const OWNED = "owned";
+const OWNED_NAME = "Już mam";
+const ownedItems = () => items.filter((i) => i.owned);
 
 // ---------- auth ----------
 
@@ -66,6 +70,7 @@ async function reload() {
 }
 
 window.addEventListener("hashchange", render);
+$("show-owned").addEventListener("change", render);
 
 function setBrand(text) {
   for (const n of document.querySelectorAll(".brand-name")) n.textContent = text;
@@ -74,7 +79,7 @@ function setBrand(text) {
 // null means the All view: no hash, or a hash that names no tab.
 function currentTabId() {
   const id = new URLSearchParams(location.hash.slice(1)).get("tab");
-  return tabs.some((t) => t.id === id) ? id : null;
+  return id === OWNED || tabs.some((t) => t.id === id) ? id : null;
 }
 
 const IMAGE_ICON = '<svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="9" cy="10" r="1.6"/><path d="M21 16l-5-5-8 8"/></svg>';
@@ -86,15 +91,20 @@ let lastTabId;
 
 function render() {
   const tabId = currentTabId();
-  const tab = tabs.find((t) => t.id === tabId);
-  const countIn = (id) => items.filter((i) => i.tabId === id).length;
+  const tab = tabId === OWNED ? { id: OWNED, name: OWNED_NAME } : tabs.find((t) => t.id === tabId);
+  const showOwned = $("show-owned").checked;
+  const plain = items.filter((i) => !i.owned);
+  const itemsIn = (id) => (id === OWNED ? ownedItems() : plain.filter((i) => i.tabId === id));
+  const countIn = (id) => itemsIn(id).length;
+  const allItems = showOwned ? items : plain;
 
-  const nav = [el("a", { href: "#", "data-id": "all" }, el("span", { class: "name" }, "Wszystko"), el("span", { class: "count" }, String(items.length)))];
+  const nav = [el("a", { href: "#", "data-id": "all" }, el("span", { class: "name" }, "Wszystko"), el("span", { class: "count" }, String(allItems.length)))];
   for (const t of tabs) {
     const a = el("a", { href: `#tab=${encodeURIComponent(t.id)}`, "data-id": t.id }, el("span", { class: "name" }, t.name), el("span", { class: "count" }, String(countIn(t.id))));
     if (isOwner) makeDraggable(a, "tab");
     nav.push(a);
   }
+  nav.push(el("a", { href: `#tab=${OWNED}`, "data-id": OWNED }, el("span", { class: "name" }, OWNED_NAME), el("span", { class: "count" }, String(countIn(OWNED)))));
   nav.find((a) => a.dataset.id === (tabId ?? "all")).setAttribute("aria-current", "page");
   // A tab past the 4th chip opens the list when it becomes active, so it is never hidden.
   if (tabId !== lastTabId && nav.findIndex((a) => a.dataset.id === (tabId ?? "all")) >= PHONE_CHIPS) moreOpen = true;
@@ -110,16 +120,17 @@ function render() {
   if (focused) (focused.id === "tabs-more" ? more : nav.find((a) => a.dataset.id === focused.dataset.id))?.focus();
 
   const shown = tab ? [tab] : tabs;
-  const shownCount = tab ? countIn(tab.id) : items.length;
+  const shownCount = tab ? countIn(tab.id) : allItems.length;
   $("view-title").textContent = tab ? tab.name : "Wszystko";
   $("view-count").textContent = pluralItems(shownCount);
   $("tab-description").textContent = tab?.description ?? "";
   $("edit-tab").textContent = tab ? `Edytuj zakładkę „${tab.name}”` : "";
-  show("edit-tab", !!tab);
+  show("edit-tab", !!tab && tab.id !== OWNED);
+  show("show-owned-row", !tab);
   show("add-item", isOwner && tabs.length > 0);
   $("sections").replaceChildren(...shown.map((t) => {
     const section = el("section", { class: "tab-section" });
-    const mine = items.filter((i) => i.tabId === t.id);
+    const mine = tab ? itemsIn(t.id) : allItems.filter((i) => i.tabId === t.id);
     if (!tab) section.append(el("div", { class: "section-head" }, el("h2", {}, t.name), el("span", {}, pluralItems(mine.length))));
     if (mine.length) section.append(el("ul", { class: "items" }, ...mine.map(itemCard)));
     return section;
@@ -141,8 +152,14 @@ function itemCard(item) {
   if (item.price != null && item.price !== "") body.append(el("p", { class: "price" }, formatPrice(item.price, item.currency)));
   if (item.description) body.append(el("p", { class: "description" }, item.description));
   body.append(findIn(item.title, url));
+  if (item.owned) body.append(el("span", { class: "owned-label" }, OWNED_NAME));
   li.append(body);
   if (isOwner) {
+    if (!item.owned) {
+      const own = el("button", { type: "button", class: "secondary item-own" }, OWNED_NAME);
+      own.addEventListener("click", () => runAndClose(null, () => updateDoc(doc(itemsCol, item.id), { owned: true })));
+      li.append(own);
+    }
     const edit = el("button", { type: "button", class: "icon-btn item-edit", "aria-label": "Edytuj pozycję" });
     edit.insertAdjacentHTML("beforeend", PENCIL_ICON);
     edit.addEventListener("click", () => openItemForm(item));
@@ -222,7 +239,7 @@ $("tab-delete").addEventListener("click", () => runAndClose("tab-dialog", async 
 
 // ---------- owner: items ----------
 
-$("add-item").addEventListener("click", () => openItemForm({ tabId: currentTabId() ?? tabs[0]?.id }));
+$("add-item").addEventListener("click", () => openItemForm({ tabId: tabs.some((t) => t.id === currentTabId()) ? currentTabId() : tabs[0]?.id, owned: currentTabId() === OWNED }));
 
 function openItemForm(item) {
   const f = $("item-form");
@@ -231,8 +248,9 @@ function openItemForm(item) {
   for (const name of ["title", "url", "imageUrl", "description"]) f.elements[name].value = item[name] ?? "";
   f.elements.price.value = item.price ?? "";
   f.elements.currency.value = item.currency ?? "PLN";
+  f.elements.owned.checked = !!item.owned;
   f.elements.tabId.replaceChildren(...tabs.map((t) => el("option", { value: t.id }, t.name)));
-  f.elements.tabId.value = item.tabId ?? currentTabId() ?? tabs[0]?.id;
+  f.elements.tabId.value = item.tabId ?? tabs[0]?.id;
   show("item-delete", !!item.id);
   itemFetch.reset();
   show("item-images", false);
@@ -288,6 +306,7 @@ $("item-form").addEventListener("submit", (e) => {
     currency: v("currency").toUpperCase() || "PLN",
     description: v("description"),
     tabId: v("tabId"),
+    owned: f.elements.owned.checked,
   };
   const old = items.find((i) => i.id === f.dataset.id);
   if (old) {
@@ -369,8 +388,10 @@ function reorder(kind, movedId, targetId, after) {
   const col = kind === "tab" ? tabsCol : itemsCol;
   const moved = (kind === "tab" ? tabs : items).find((x) => x.id === movedId);
   // In the All view an item can be dropped on an item of another tab: that is not a reorder.
-  if (kind === "item" && items.find((i) => i.id === targetId)?.tabId !== moved.tabId) return;
-  const list = (kind === "tab" ? tabs : items.filter((i) => i.tabId === moved.tabId)).filter((x) => x.id !== movedId);
+  // The "Już mam" view mixes tabs, so there an owned item reorders among owned items.
+  const sameGroup = (i) => (moved.owned ? !!i.owned : !i.owned && i.tabId === moved.tabId);
+  if (kind === "item" && !sameGroup(items.find((i) => i.id === targetId))) return;
+  const list = (kind === "tab" ? tabs : items.filter(sameGroup)).filter((x) => x.id !== movedId);
   const at = list.findIndex((x) => x.id === targetId) + (after ? 1 : 0);
   const prev = list[at - 1]?.order;
   const next = list[at]?.order;
@@ -379,7 +400,7 @@ function reorder(kind, movedId, targetId, after) {
 }
 
 function moveItemToTab(itemId, tabId) {
-  const order = nextOrder(items.filter((i) => i.tabId === tabId));
+  const order = nextOrder(items.filter((i) => i.tabId === tabId && !i.owned));
   runAndClose(null, () => updateDoc(doc(itemsCol, itemId), { tabId, order }));
 }
 

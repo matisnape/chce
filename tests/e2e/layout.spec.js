@@ -29,7 +29,7 @@ const titles = (page) => page.locator(".item h3");
 test("guest with no hash sees the All view: one heading per tab, its items under it", async ({ page }) => {
   await asGuest(page);
   await expect(page.locator("#view-title")).toHaveText("Wszystko");
-  await expect(page.locator(".tab-section h2")).toHaveText(["Książki", "Już mam"]);
+  await expect(page.locator(".tab-section h2")).toHaveText(["Książki", "Prezenty"]);
   await expect(page.locator(".tab-section").first().locator(".item h3")).toHaveText(["Książka A", "Książka B"]);
   await expect(page.locator(".tab-section").nth(1).locator(".item")).toHaveCount(0);
   await expect(page.locator("#view-count")).toHaveText("2 pozycje");
@@ -56,7 +56,7 @@ test("guest clicks a tab: only its items show, the hash is set and a reload keep
 
 test("nav shows Wszystko first and an item count on every entry", async ({ page }) => {
   await asGuest(page);
-  await expect(page.locator("#tabs a")).toHaveText([/Wszystko\s*2/, /Książki\s*2/, /Już mam\s*0/]);
+  await expect(page.locator("#tabs a")).toHaveText([/Wszystko\s*2/, /Książki\s*2/, /Prezenty\s*0/, /Już mam\s*0/]);
 });
 
 test("guest sees no owner controls", async ({ page }) => {
@@ -128,20 +128,20 @@ test("⋯ menu closes on Escape", async ({ page }) => {
   await expect(menuButton(page)).toHaveAttribute("aria-expanded", "false");
 });
 
-test("phone, 7 tabs: 4 chips and +4 więcej, no sideways scroll, the button reveals all 8", async ({ page }) => {
+test("phone, 7 tabs and Już mam: 4 chips and +5 więcej, no sideways scroll, the button reveals all 9", async ({ page }) => {
   for (let i = 3; i <= 7; i++) await seedDoc(`lists/main/tabs/t${i}`, { name: `Zakładka ${i}`, description: "", order: i });
   await page.setViewportSize({ width: 390, height: 844 });
   await asGuest(page);
   const chips = page.locator("#tabs a");
   await expect(chips.filter({ visible: true })).toHaveCount(4);
   const more = page.locator("#tabs-more");
-  await expect(more).toHaveText("+4 więcej");
+  await expect(more).toHaveText("+5 więcej");
   await expect(page.locator("#sidebar-toggle")).toBeHidden();
   const widths = () => page.evaluate(() => [document.documentElement.scrollWidth, document.documentElement.clientWidth]);
   const [scroll, client] = await widths();
   expect(scroll).toBe(client);
   await more.click();
-  await expect(chips.filter({ visible: true })).toHaveCount(8);
+  await expect(chips.filter({ visible: true })).toHaveCount(9);
   await expect(more).toHaveText("Mniej");
   await expect(more).toHaveAttribute("aria-expanded", "true");
   const [scroll2, client2] = await widths();
@@ -213,7 +213,7 @@ test("tab drag in the desktop sidebar uses the vertical axis", async ({ page }) 
   // Lower half, left side: books goes after have.
   await books.dragTo(have, { targetPosition: { x: 10, y: h - 4 } });
   await expect.poll(async () => idsByOrder(await orderOf("tabs"))).toEqual(["have", "books"]);
-  await expect(page.locator("#tabs a .name")).toHaveText(["Wszystko", "Już mam", "Książki"]);
+  await expect(page.locator("#tabs a .name")).toHaveText(["Wszystko", "Prezenty", "Książki", "Już mam"]);
   // Upper half, right side: books goes back before have.
   const w = (await have.boundingBox()).width;
   await books.dragTo(have, { targetPosition: { x: w - 10, y: 4 } });
@@ -237,7 +237,7 @@ test("tab drag among the phone chips uses the horizontal axis", async ({ page })
   await asOwner(page);
   await dropTab(page, "books", "have", 0.9, 0.1);
   await expect.poll(async () => idsByOrder(await orderOf("tabs"))).toEqual(["have", "books"]);
-  await expect(page.locator("#tabs a .name")).toHaveText(["Wszystko", "Już mam", "Książki"]);
+  await expect(page.locator("#tabs a .name")).toHaveText(["Wszystko", "Prezenty", "Książki", "Już mam"]);
   await dropTab(page, "books", "have", 0.1, 0.9);
   await expect.poll(async () => idsByOrder(await orderOf("tabs"))).toEqual(["books", "have"]);
 });
@@ -260,7 +260,7 @@ test("keyboard: focus stays on +N więcej and Mniej", async ({ page }) => {
   await expect(more).toHaveText("Mniej");
   expect(await page.evaluate(() => document.activeElement.id)).toBe("tabs-more");
   await page.keyboard.press("Enter");
-  await expect(more).toHaveText("+4 więcej");
+  await expect(more).toHaveText("+5 więcej");
   expect(await page.evaluate(() => document.activeElement.id)).toBe("tabs-more");
 });
 
@@ -297,7 +297,7 @@ test("phone: an active tab past the 4th chip is visible right away", async ({ pa
   await expect(page.locator('#tabs a[aria-current="page"]')).toBeVisible();
   // Mniej still collapses while that tab stays active.
   await page.locator("#tabs-more").click();
-  await expect(page.locator("#tabs-more")).toHaveText("+4 więcej");
+  await expect(page.locator("#tabs-more")).toHaveText("+5 więcej");
 });
 
 test("phone: Bookmarklet and Wyloguj are 44px tall", async ({ page }) => {
