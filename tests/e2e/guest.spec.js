@@ -28,7 +28,7 @@ test("right password shows tabs and items, and a reload skips the prompt", async
   await page.goto(APP);
   await page.fill("#password", GUEST.password);
   await page.click('#gate button[type="submit"]');
-  await expect(page.locator("#tabs a .name")).toHaveText(["Wszystko", "Książki", "Już mam"]);
+  await expect(page.locator("#tabs a .name")).toHaveText(["Wszystko", "Książki", "Prezenty", "Już mam"]);
   await expect(page.locator(".item h3")).toHaveText(["Książka A", "Książka B"]);
   await page.click('#tabs a[data-id="books"]');
   await expect(page.locator("#tab-description")).toHaveText("Do czytania");

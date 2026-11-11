@@ -30,7 +30,7 @@ export async function reset() {
 }
 
 const toFields = (obj) => Object.fromEntries(Object.entries(obj).map(([k, v]) =>
-  [k, typeof v === "number" ? { doubleValue: v } : v === null ? { nullValue: null } : { stringValue: String(v) }]));
+  [k, typeof v === "number" ? { doubleValue: v } : typeof v === "boolean" ? { booleanValue: v } : v === null ? { nullValue: null } : { stringValue: String(v) }]));
 
 export async function seedDoc(path, data) {
   const r = await fetch(`${DOCS}/${path}`, { method: "PATCH", headers: admin, body: JSON.stringify({ fields: toFields(data) }) });
@@ -63,7 +63,7 @@ export async function signUpStranger() {
 export async function seedList() {
   await seedDoc("lists/main", { title: "chce" });
   await seedDoc("lists/main/tabs/books", { name: "Książki", description: "Do czytania", order: 1 });
-  await seedDoc("lists/main/tabs/have", { name: "Już mam", description: "", order: 2 });
+  await seedDoc("lists/main/tabs/have", { name: "Prezenty", description: "", order: 2 });
   await seedDoc("lists/main/items/a", { tabId: "books", title: "Książka A", url: "https://shop.example/a", imageUrl: null, price: 49.9, currency: "PLN", description: "twarda okładka", order: 1 });
   await seedDoc("lists/main/items/b", { tabId: "books", title: "Książka B", url: "https://shop.example/b", imageUrl: null, price: null, currency: "PLN", description: "", order: 2 });
 }

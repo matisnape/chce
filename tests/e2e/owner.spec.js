@@ -53,9 +53,9 @@ test("drag reorders items and the order survives a reload and shows for guests",
 
 test("dropping an item on another tab moves it there", async ({ page }) => {
   await page.click('#tabs a[data-id="books"]');
-  await page.locator(".item", { hasText: "Książka A" }).dragTo(page.locator("#tabs a", { hasText: "Już mam" }));
+  await page.locator(".item", { hasText: "Książka A" }).dragTo(page.locator("#tabs a", { hasText: "Prezenty" }));
   await expect(titles(page)).toHaveText(["Książka B"]);
-  await page.click('#tabs a:has-text("Już mam")');
+  await page.click('#tabs a:has-text("Prezenty")');
   await expect(titles(page)).toHaveText(["Książka A"]);
 });
 
@@ -74,7 +74,7 @@ test("owner edits and deletes an item; a tab with items cannot be deleted", asyn
   await page.click('#tabs a[data-id="books"]');
   await menuItem(page, /Edytuj zakładkę/);
   await page.click("#tab-delete");
-  await expect(page.locator("#tabs a .name")).toHaveText(["Wszystko", "Książki", "Już mam"]);
+  await expect(page.locator("#tabs a .name")).toHaveText(["Wszystko", "Książki", "Prezenty", "Już mam"]);
 });
 
 test("rules: the owner can write", async () => {
