@@ -140,6 +140,10 @@ input, select, textarea { font-size: 1rem; } /* iOS zooms on focus below 16px (#
 main.narrow { max-width: 560px; }
 #add-form, #signin { display: grid; gap: 10px; }
 #add-form label { display: grid; gap: 4px; font-size: .9rem; }
+#add-form { position: relative; }
+#add-form h1 { padding-right: 52px; }
+#add-form .close { position: absolute; top: -6px; right: 0; width: 44px; height: 44px; padding: 0; background: none; color: var(--fg); border: 0; font-size: 1.3rem; }
+#add-form .actions button { min-height: 44px; }
 #add-form input, #add-form textarea, #add-form select { background: var(--card); }
 fieldset { border: 1px solid var(--line); border-radius: 8px; display: grid; gap: 8px; }
 .image-picker { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
