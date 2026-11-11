@@ -89,7 +89,7 @@ for (const [code, text] of [[401, "Sesja wygasła"], [403, "nie może pobierać"
 
 // The Worker puts the shop's own status in the 502 body; the message follows it.
 for (const [upstream, text] of [
-  [421, "nie wpuszcza serwera chce (kod 421)"], [403, "nie wpuszcza serwera chce (kod 403)"], [429, "nie wpuszcza serwera chce (kod 429)"],
+  [421, "nie wpuszcza serwera chce (kod 421). Otwórz stronę produktu i użyj zakładki 🎁 chce (na iPhonie: Udostępnij → „chce”) albo wpisz dane ręcznie."], [403, "nie wpuszcza serwera chce (kod 403)"], [429, "nie wpuszcza serwera chce (kod 429)"],
   [404, "nie ma takiej strony"], [0, "nie odpowiedział na czas"],
 ]) {
   test(`Worker 502 with shop status ${upstream}: the message says what to do`, async ({ page }) => {
