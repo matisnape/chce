@@ -32,6 +32,13 @@ test("the published script returns what extract(document) returns", async ({ pag
   expect(expected.images.length).toBeGreaterThan(0);
 });
 
+test("the published script reads a price kept only in a hidden input", async ({ page }) => {
+  const { got, expected } = await runShortcutScript(page, "hidden-price");
+  expect(JSON.parse(decodeURIComponent(got))).toEqual(expected);
+  expect(expected.price).toBe("499.9");
+  expect(expected.currency).toBe("PLN");
+});
+
 test("a page extract() cannot read still completes, with an empty result", async ({ page }) => {
   const script = await (await page.request.get("/js/shortcut.js")).text();
   await page.goto(`${FIXTURE}/price-meta.html`);

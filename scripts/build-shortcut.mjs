@@ -1,7 +1,7 @@
 // Builds the iPhone share-sheet shortcut's two parts from the tested code.
 //   node scripts/build-shortcut.mjs            rewrites js/shortcut.js (script the shortcut fetches at run time)
-//   node scripts/build-shortcut.mjs <dir>      also writes <dir>/chce.plist and <dir>/chce-dev.plist, to sign with
-//     shortcuts sign --mode anyone --input <dir>/chce.plist --output chce.shortcut   (same for chce-dev)
+//   node scripts/build-shortcut.mjs <dir>      also writes <dir>/chce-unsigned.shortcut and <dir>/chce-dev-unsigned.shortcut, to sign with
+//     shortcuts sign --mode anyone --input <dir>/chce-unsigned.shortcut --output chce.shortcut   (same for chce-dev)
 // Two shortcuts: "chce" carries the script as a literal (daily use, no network fetch of code);
 // "chce-dev" fetches js/shortcut.js from the site at run time (picks up changes without re-import).
 // js/shortcut.js is generated from js/extract.js; tests/shortcut.test.mjs fails when they drift.
@@ -71,7 +71,7 @@ if (process.argv[1] === new URL(import.meta.url).pathname) {
   writeFileSync(new URL("../js/shortcut.js", import.meta.url), buildScript());
   const dir = process.argv[2];
   if (dir) {
-    writeFileSync(`${dir}/chce.plist`, plistXml("embedded"));
-    writeFileSync(`${dir}/chce-dev.plist`, plistXml("dev"));
+    writeFileSync(`${dir}/chce-unsigned.shortcut`, plistXml("embedded"));
+    writeFileSync(`${dir}/chce-dev-unsigned.shortcut`, plistXml("dev"));
   }
 }

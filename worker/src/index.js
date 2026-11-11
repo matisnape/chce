@@ -176,8 +176,15 @@ export function slimHtml(html) {
     }
     out.push(s);
   });
+  // The hidden price input some shops use alone; indexOf on the id, no regex over the body.
+  const hid = ["twister-plus-price-data-price", "twister-plus-price-data-price-unit"].flatMap((id) => {
+    const i = rest.indexOf(`id="${id}"`);
+    if (i < 0) return [];
+    const s = rest.lastIndexOf("<", i), e = rest.indexOf(">", i);
+    return s < 0 || e < 0 ? [] : [rest.slice(s, e + 1)];
+  });
   const imgs = take(/<img\b[^>]*>/gi, 60, (m, out) => out.push(m[0]));
-  return `<!doctype html><html>${head}<body>${props.join("")}${ld.join("")}${imgs.join("")}</body></html>`;
+  return `<!doctype html><html>${head}<body>${props.join("")}${hid.join("")}${ld.join("")}${imgs.join("")}</body></html>`;
 }
 
 // Gives extract() the few browser fields it reads, on top of the linkedom document.
