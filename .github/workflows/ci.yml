@@ -33,3 +33,19 @@ jobs:
       - run: npm ci
       - run: npx playwright install --with-deps chromium webkit
       - run: npm test
+
+  # Only macOS has Apple's `aea`, so only this job opens the signed .shortcut files.
+  # Standard runner label: larger runners are billed. No dependencies: the test imports only repo files.
+  shortcut:
+    name: signed shortcuts
+    runs-on: macos-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v7
+
+      # Keep equal to mise.toml.
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24.12.0
+
+      - run: node tests/shortcut.test.mjs

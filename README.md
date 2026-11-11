@@ -14,4 +14,4 @@ shortcuts sign --mode anyone --input /tmp/chce-build/chce.plist --output chce.sh
 shortcuts sign --mode anyone --input /tmp/chce-build/chce-dev.plist --output chce-dev.shortcut
 ```
 
-`npm run test:unit` fails when `js/shortcut.js` is stale. On macOS it also opens both signed files and fails when they differ from the build. CI skips that part (no `aea` on Ubuntu), so re-sign before pushing.
+`npm run test:unit` fails when `js/shortcut.js` is stale. On macOS it also opens both signed files and fails when they differ from the build. CI runs that part in a separate macOS job, so a stale signed file fails the pull request.
