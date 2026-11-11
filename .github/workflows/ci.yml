@@ -31,7 +31,7 @@ jobs:
           java-version: "21"
 
       - run: npm ci
-      - run: npx playwright install chromium webkit
+      - run: npx playwright install --with-deps chromium webkit
       - run: npm test
 
   # Only macOS has Apple's `aea`, so only this job opens the signed .shortcut files.
