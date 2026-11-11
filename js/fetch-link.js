@@ -20,7 +20,7 @@ const WORKER_ERRORS = {
 // follows it. A missing or unreadable body keeps the generic WORKER_ERRORS[502].
 function shopRefusal(status) {
   if ([403, 421, 429].includes(status)) {
-    return `Sklep nie wpuszcza serwera chce (kod ${status}). Otwórz stronę produktu i użyj zakładki 🎁 chce albo wpisz dane ręcznie.`;
+    return `Sklep nie wpuszcza serwera chce (kod ${status}). Otwórz stronę produktu i użyj zakładki 🎁 chce (na iPhonie: Udostępnij → „chce”) albo wpisz dane ręcznie.`;
   }
   if (status === 404) return "Sklep zgłasza, że nie ma takiej strony. Sprawdź link albo wpisz dane ręcznie.";
   if (status === 0) return "Sklep nie odpowiedział na czas. Spróbuj jeszcze raz albo wpisz dane ręcznie.";
