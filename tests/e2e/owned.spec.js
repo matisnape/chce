@@ -97,3 +97,51 @@ test("Wszystko hides owned items until the filter is checked; owned cards then c
   await page.reload();
   await expect(page.locator("#show-owned")).not.toBeChecked();
 });
+
+// Issue #47: the control is a pale pink pill in the card's bottom-right corner; body text flows above it.
+test.describe("pill placement on a phone", () => {
+  test.use({ viewport: { width: 390, height: 800 } });
+  const box = (loc) => loc.evaluate((e) => { const r = e.getBoundingClientRect(); return { left: r.left, right: r.right, top: r.top, bottom: r.bottom, width: r.width, height: r.height }; });
+  const chipBg = (page) => page.evaluate(() => { const d = document.createElement("i"); d.style.background = "var(--chip-bg)"; document.body.append(d); const c = getComputedStyle(d).backgroundColor; d.remove(); return c; });
+
+  async function checkPill(page, card, pill, minHeight = 0) {
+    const c = await box(card);
+    const p = await box(pill);
+    expect(c.right - p.right).toBeGreaterThanOrEqual(0);
+    expect(c.right - p.right).toBeLessThanOrEqual(16);
+    expect(c.bottom - p.bottom).toBeGreaterThanOrEqual(0);
+    expect(c.bottom - p.bottom).toBeLessThanOrEqual(16);
+    expect(p.height).toBeGreaterThanOrEqual(minHeight);
+    expect(await pill.evaluate((e) => getComputedStyle(e).backgroundColor)).toBe(await chipBg(page));
+    // wrap: the title spans the pill's x-range, above it, so no full-height column is reserved
+    const fontSize = (loc) => loc.evaluate((e) => parseFloat(getComputedStyle(e).fontSize));
+    expect(await fontSize(card.locator(".find-in"))).toBeLessThan(await fontSize(card.locator("h3")));
+    const t = await box(card.locator("h3"));
+    expect(t.right).toBeGreaterThan(p.left);
+    expect(t.bottom).toBeLessThanOrEqual(p.top);
+  }
+
+  test("owner: the button on a not-owned item", async ({ page }) => {
+    await asOwner(page);
+    const card = page.locator(".item", { hasText: "Książka A" });
+    await checkPill(page, card, ownBtn(card), 44);
+    const edit = await box(card.getByRole("button", { name: "Edytuj pozycję" }));
+    expect(edit.top - (await box(card)).top).toBeLessThan(20);
+  });
+
+  test("owned item shows the label as the same pill", async ({ page }) => {
+    await seedDoc("lists/main/items/z", { tabId: "books", owned: true, title: "Mam to", url: null, imageUrl: null, price: null, currency: "PLN", description: "", order: 3 });
+    await asOwner(page);
+    await ownedLink(page).click();
+    const card = page.locator(".item", { hasText: "Mam to" });
+    await checkPill(page, card, card.locator(".owned-label"));
+  });
+
+  test("guest sees no button on a not-owned item", async ({ page }) => {
+    await page.goto(APP);
+    await page.fill("#password", GUEST.password);
+    await page.click('#gate button[type="submit"]');
+    await expect(page.locator("#list")).toBeVisible();
+    await expect(ownBtn(page)).toHaveCount(0);
+  });
+});
