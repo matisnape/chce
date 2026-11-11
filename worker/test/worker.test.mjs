@@ -153,14 +153,21 @@ const NESTED_PAGE = `<html><head><title>Boot</title></head><body>
   <span itemprop="price"><span>49</span><span>,90</span></span><meta itemprop="priceCurrency" content="PLN">
   <script type="application/ld+json">{"@type":"BreadcrumbList","itemListElement":[]}</script></body></html>`;
 
+// Price only as hidden inputs, the unit as a symbol.
+const HIDDEN_PAGE = `<html><head><title>Kettle</title></head><body><h1>Kettle</h1>
+  <input type="hidden" id="twister-plus-price-data-price" value="499.9">
+  <input type="hidden" id="twister-plus-price-data-price-unit" value="zł"></body></html>`;
+
 test("slimmed and full parse give the same result on the fixtures", () => {
-  for (const html of [PRODUCT_PAGE, ITEMPROP_PAGE, NESTED_PAGE]) {
+  for (const html of [PRODUCT_PAGE, ITEMPROP_PAGE, NESTED_PAGE, HIDDEN_PAGE]) {
     const url = "https://shop.example/final/p";
     assert.deepEqual(extractFromHtml(html, url), extractFromHtml(html, url, { full: true }));
   }
   assert.equal(extractFromHtml(ITEMPROP_PAGE, SHOP).price, "19,99");
   assert.equal(extractFromHtml(ITEMPROP_PAGE, SHOP).currency, "EUR");
   assert.equal(extractFromHtml(NESTED_PAGE, SHOP).price, "49,90");
+  assert.equal(extractFromHtml(HIDDEN_PAGE, SHOP).price, "499.9");
+  assert.equal(extractFromHtml(HIDDEN_PAGE, SHOP).currency, "PLN");
 });
 
 test("a 1.5 MB page slims under 100 KB and still gives the full-parse result", () => {

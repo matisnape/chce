@@ -59,6 +59,12 @@ test("price only in product:price:amount meta is read", async ({ page }) => {
   await expect(popup.locator('[name="currency"]')).toHaveValue("PLN");
 });
 
+test("price only in a hidden input is read, the zł unit becomes PLN", async ({ page }) => {
+  const popup = await runBookmarklet(page, "hidden-price");
+  await expect(popup.locator('[name="price"]')).toHaveValue("499.9");
+  await expect(popup.locator('[name="currency"]')).toHaveValue("PLN");
+});
+
 test("no price leaves the field empty and editable, and save works", async ({ page }) => {
   const popup = await runBookmarklet(page, "no-price");
   const price = popup.locator('[name="price"]');

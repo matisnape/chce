@@ -11,6 +11,8 @@ export function extract(doc) {
     }
     return null;
   };
+  // A shop that renders the price only as a hidden input with a fixed id; the last resort.
+  const hidden = (id) => doc.querySelector(`input[type="hidden"][id="${id}"]`)?.getAttribute("value")?.trim() || null;
   const text = (v) => (typeof v === "string" ? v.trim() : ""); // JSON-LD names may be objects
   const abs = (u) => { try { const x = new URL(u, doc.baseURI); return /^https?:$/.test(x.protocol) ? x.href : null; } catch { return null; } };
 
@@ -43,8 +45,12 @@ export function extract(doc) {
 
   const price = meta("product:price:amount", "og:price:amount", "price")
     ?? (offerPrice != null ? String(offerPrice) : null)
-    ?? doc.querySelector('[itemprop="price"]')?.textContent?.trim() ?? null;
-  const currency = meta("product:price:currency", "og:price:currency", "priceCurrency") ?? offer?.priceCurrency ?? null;
+    ?? doc.querySelector('[itemprop="price"]')?.textContent?.trim()
+    ?? hidden("twister-plus-price-data-price");
+  const SYMBOL = { "zł": "PLN", "€": "EUR", "£": "GBP" }; // fetch-link accepts 3-letter codes only
+  const unit = hidden("twister-plus-price-data-price-unit");
+  const currency = meta("product:price:currency", "og:price:currency", "priceCurrency") ?? offer?.priceCurrency
+    ?? (price && unit ? SYMBOL[unit] ?? null : null);
 
   // Images: what the shop declares first, then the page's largest pictures.
   const declared = [meta("og:image:secure_url", "og:image"), meta("twitter:image")]
