@@ -89,6 +89,13 @@ const PHONE_CHIPS = 4; // "Wszystko" counts as one; the rest hide behind "+N wi�
 let moreOpen = false;
 let lastTabId;
 
+function tabEditBtn(tab) {
+  const b = el("button", { type: "button", class: "icon-btn tab-edit owner-only", "aria-label": `Edytuj zakładkę „${tab.name}”` });
+  b.insertAdjacentHTML("beforeend", PENCIL_ICON);
+  b.addEventListener("click", () => openTabForm(tab));
+  return b;
+}
+
 function render() {
   const tabId = currentTabId();
   const tab = tabId === OWNED ? { id: OWNED, name: OWNED_NAME } : tabs.find((t) => t.id === tabId);
@@ -123,6 +130,8 @@ function render() {
   const shownCount = tab ? countIn(tab.id) : allItems.length;
   $("view-title").textContent = tab ? tab.name : "Wszystko";
   $("view-count").textContent = pluralItems(shownCount);
+  $("view-head").querySelector(".tab-edit")?.remove();
+  if (tab && tab.id !== OWNED) $("view-title").after(tabEditBtn(tab));
   $("tab-description").textContent = tab?.description ?? "";
   $("edit-tab").textContent = tab ? `Edytuj zakładkę „${tab.name}”` : "";
   show("edit-tab", !!tab && tab.id !== OWNED);
@@ -131,7 +140,7 @@ function render() {
   $("sections").replaceChildren(...shown.map((t) => {
     const section = el("section", { class: "tab-section" });
     const mine = tab ? itemsIn(t.id) : allItems.filter((i) => i.tabId === t.id);
-    if (!tab) section.append(el("div", { class: "section-head" }, el("h2", {}, t.name), el("span", {}, pluralItems(mine.length))));
+    if (!tab) section.append(el("div", { class: "section-head" }, el("h2", {}, t.name), tabEditBtn(t), el("span", {}, pluralItems(mine.length))));
     if (mine.length) section.append(el("ul", { class: "items" }, ...mine.map(itemCard)));
     return section;
   }));
