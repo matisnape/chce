@@ -14,5 +14,5 @@ const d = extract(document);
 console.error(JSON.stringify(d, null, 1));
 const json = JSON.stringify(d);
 const add = "https://anks.pl/chce/add.html#";
-const newUrl = add + "b64-" + Buffer.from(json).toString("base64url");
-writeFileSync("hashes.txt", [add + encodeURIComponent(json), newUrl, encodeURIComponent(json), add, newUrl + newUrl.slice(40)].join("\n") + "\n");
+const pct = encodeURIComponent(json), dots = pct.replace(/\./g, "%2E"), b = Buffer.from(json).toString("base64url");
+writeFileSync("hashes.txt", [add + pct, add + dots, dots, add + b, add + "b64_" + b, add + dots + dots.slice(0, 1200)].join("\n") + "\n");
