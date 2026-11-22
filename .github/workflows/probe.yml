@@ -17,18 +17,16 @@ jobs:
         run: node .github/probe/real.mjs
       - name: link detection on old vs new hash
         run: swift .github/probe/detect.swift
-      - name: live shortcut.js vs main
+      - name: try signing the rebuilt shortcuts here
         run: |
-          curl -sSI https://anks.pl/chce/js/shortcut.js | grep -iE "^(HTTP|cache-control|last-modified|age|etag|location)"
-          curl -sSL https://anks.pl/chce/js/shortcut.js -o live.js
-          git fetch -q origin main && git show origin/main:js/shortcut.js > main.js
-          cmp live.js main.js && echo "live == main" || { echo "live != main"; head -c 300 live.js; }
-          curl -sSI https://anks.pl/chce/add.html | grep -iE "^(HTTP|location)"
-      - name: actions inside the signed chce-dev.shortcut
-        run: |
-          f=chce-dev.shortcut; d=$(mktemp -d)
-          node -e 'const b=require("fs").readFileSync(process.argv[1]);require("fs").writeFileSync(process.argv[2],b.subarray(12,12+b.readUInt32LE(8)))' $f $d/hdr.plist
-          plutil -extract SigningCertificateChain.0 raw -o - $d/hdr.plist | base64 -d > $d/leaf.der
-          openssl x509 -inform der -in $d/leaf.der -pubkey -noout > $d/pub.pem
-          aea decrypt -i $f -o $d/p.aar -sign-pub $d/pub.pem && mkdir $d/x && aa extract -i $d/p.aar -d $d/x
-          plutil -convert json -o - $d/x/Shortcut.wflow | python3 -c 'import json,sys; [print(json.dumps(a)[:600]) for a in json.load(sys.stdin)["WFWorkflowActions"]]'
+          mkdir -p build out
+          node scripts/build-shortcut.mjs build
+          shortcuts sign --mode anyone --input build/chce-unsigned.shortcut --output out/chce.shortcut
+          shortcuts sign --mode anyone --input build/chce-dev-unsigned.shortcut --output out/chce-dev.shortcut
+          cp out/*.shortcut . && node tests/shortcut.test.mjs
+      - uses: actions/upload-artifact@v6
+        if: always()
+        with:
+          name: signed
+          path: out/
+          if-no-files-found: ignore

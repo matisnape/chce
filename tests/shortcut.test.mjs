@@ -14,6 +14,12 @@ assert.equal(published, buildScript(), "js/shortcut.js is stale: run `node scrip
 const js = (kind) => buildPlist(kind).WFWorkflowActions.find((a) => a.WFWorkflowActionIdentifier.endsWith("runjavascriptonwebpage")).WFWorkflowActionParameters.WFJavaScript;
 assert.equal(js("embedded"), published, "chce embeds a script that differs from js/shortcut.js");
 assert.equal(typeof js("dev"), "object", "chce-dev must fetch the script, not embed it");
+// Open URL turns each piece of its text into links separately: it must get the script's result alone.
+for (const kind of ["embedded", "dev"]) {
+  const open = buildPlist(kind).WFWorkflowActions.find((a) => a.WFWorkflowActionIdentifier.endsWith("openurl")).WFWorkflowActionParameters.WFInput;
+  assert.equal(open.WFSerializationType, "WFTextTokenAttachment", `${kind}: Open URL must take the JavaScript result alone`);
+  assert.equal(open.Value.OutputName, "JavaScript Result");
+}
 console.log("shortcut.js matches extract.js and the embedded literal");
 
 // The signed files are what users import. Opening one needs Apple's `aea` (macOS only, not on CI).
@@ -39,5 +45,8 @@ else {
   const dev = unwrap(`${root}chce-dev.shortcut`);
   assert.deepEqual(dev.WFWorkflowActions.map((a) => a.WFWorkflowActionIdentifier.replace("is.workflow.actions.", "")),
     ["downloadurl", "detect.text", "runjavascriptonwebpage", "openurl"], "chce-dev.shortcut is stale");
+  const openOf = (plist) => plist.WFWorkflowActions.find((a) => a.WFWorkflowActionIdentifier.endsWith("openurl")).WFWorkflowActionParameters.WFInput;
+  for (const [name, plist] of [["chce", embedded], ["chce-dev", dev]])
+    assert.equal(openOf(plist).WFSerializationType, "WFTextTokenAttachment", `${name}.shortcut is stale: Open URL must take the JavaScript result alone`);
   console.log("signed shortcuts match the build");
 }

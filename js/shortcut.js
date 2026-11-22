@@ -82,5 +82,5 @@
 })(document); } catch (e) {}
   let s = "";
   for (const b of new TextEncoder().encode(JSON.stringify(d))) s += String.fromCharCode(b);
-  completion("b64=" + btoa(s).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, ""));
+  completion("https://anks.pl/chce/add.html#b64-" + btoa(s).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, ""));
 })();
