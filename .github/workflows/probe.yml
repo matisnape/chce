@@ -9,6 +9,12 @@ jobs:
     timeout-minutes: 5
     steps:
       - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24.12.0
+      - run: npm install --no-save linkedom@0.18.15
+      - name: extract() on the real page
+        run: node .github/probe/real.mjs
       - name: link detection on old vs new hash
         run: swift .github/probe/detect.swift
       - name: live shortcut.js vs main
