@@ -5,13 +5,13 @@ import { reset, seedList, listIds, OWNER } from "./emulator.js";
 
 const FIXTURE = "http://localhost:4174/tests/fixtures";
 
-// The script's result is the whole add-page URL, its hash "b64-" + base64url JSON (see scripts/build-shortcut.mjs).
+// The script's result is the whole add-page URL; its hash is the percent-encoded JSON (see scripts/build-shortcut.mjs).
 const ADD = "https://anks.pl/chce/add.html#";
 const hashOf = (got) => {
-  expect(got).toMatch(/^https:\/\/anks\.pl\/chce\/add\.html#b64-[A-Za-z0-9_-]*$/);
+  expect(got.startsWith(ADD)).toBe(true);
   return got.slice(ADD.length);
 };
-const decode = (got) => JSON.parse(Buffer.from(hashOf(got).slice(4), "base64url").toString("utf8"));
+const decode = (got) => JSON.parse(decodeURIComponent(hashOf(got)));
 
 test.beforeEach(async () => {
   await reset();
@@ -65,7 +65,7 @@ test("add.html opened without popup is prefilled and never tries to close itself
   await page.evaluate(({ email, password }) => window.__signInOwner(email, password), OWNER);
   await expect(page.locator("#add-item")).toBeVisible();
   const data = { title: "Lamp Aurora", price: "249.9", currency: "PLN", url: "https://shop.example/lamp", images: [] };
-  await page.goto(`/add.html?emulator#b64-${Buffer.from(JSON.stringify(data)).toString("base64url")}`);
+  await page.goto(`/add.html?emulator#${encodeURIComponent(JSON.stringify(data))}`);
   await expect(page.locator('[name="title"]')).toHaveValue("Lamp Aurora");
   await page.click('#add-form button[type="submit"]');
   await expect(page.locator("#saved")).toBeVisible();
@@ -94,21 +94,10 @@ test("the script's result, appended to add.html#, survives %, &, # and Polish le
 
 // Open URL runs link detection on its text: a percent-encoded shop URL in the hash ("…%2Fwww.shop.pl…")
 // was opened as extra tabs ("2fwww.shop.pl"). After the add-page address, nothing may read as a domain.
-test("the page data in the script's result holds no dot, slash, percent sign or colon", async ({ page }) => {
+test("the page data in the script's result holds no dot, slash or colon", async ({ page }) => {
   const { got, expected } = await runShortcutScript(page, "product-jsonld");
   expect(expected.images.length).toBeGreaterThan(0);
-  expect(hashOf(got)).not.toMatch(/[./%:=]/);
-});
-
-test("add.html still reads the bookmarklet's percent-encoded hash", async ({ page }) => {
-  await page.goto("/index.html?emulator");
-  await page.waitForFunction(() => window.__signInOwner);
-  await page.evaluate(({ email, password }) => window.__signInOwner(email, password), OWNER);
-  await expect(page.locator("#add-item")).toBeVisible();
-  const data = { title: "Zażółć 100%", url: "https://shop.example/a?b=1", images: [] };
-  await page.goto(`/add.html?emulator#${encodeURIComponent(JSON.stringify(data))}`);
-  await expect(page.locator('[name="title"]')).toHaveValue("Zażółć 100%");
-  await expect(page.locator('[name="url"]')).toHaveValue("https://shop.example/a?b=1");
+  expect(hashOf(got)).not.toMatch(/[./:]/);
 });
 
 test("bookmarklet.html hands out the shortcut with Polish setup steps", async ({ page }) => {

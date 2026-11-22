@@ -37,15 +37,8 @@ addEventListener("hashchange", () => location.reload());
 
 // The hash comes from whatever page the bookmarklet ran on, so this is the only guard on it:
 // keep known fields of the right type and length. The description is never taken from it.
-// Two formats: the bookmarklet's percent-encoded JSON, and the shortcut's "b64-" + base64url JSON.
 function readHash() {
-  const h = location.hash.slice(1);
-  try { return clean(JSON.parse(h.startsWith("b64-") ? fromBase64Url(h.slice(4)) : decodeURIComponent(h))); } catch { return clean({}); }
-}
-
-function fromBase64Url(s) {
-  const bin = atob(s.replace(/-/g, "+").replace(/_/g, "/"));
-  return new TextDecoder().decode(Uint8Array.from(bin, (c) => c.charCodeAt(0)));
+  try { return clean(JSON.parse(decodeURIComponent(location.hash.slice(1)))); } catch { return clean({}); }
 }
 
 async function fillForm() {

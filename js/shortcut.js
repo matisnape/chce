@@ -80,7 +80,5 @@
     images,
   };
 })(document); } catch (e) {}
-  let s = "";
-  for (const b of new TextEncoder().encode(JSON.stringify(d))) s += String.fromCharCode(b);
-  completion("https://anks.pl/chce/add.html#b64-" + btoa(s).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, ""));
+  completion("https://anks.pl/chce/add.html#" + encodeURIComponent(JSON.stringify(d)).replace(/\./g, "%2E"));
 })();
