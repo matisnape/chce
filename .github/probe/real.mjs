@@ -7,6 +7,7 @@ const html = await (await fetch(url, { headers: { "user-agent": "Mozilla/5.0 (iP
 const { document } = parseHTML(html);
 const proto = Object.getPrototypeOf(document.createElement("img"));
 proto.getBoundingClientRect = () => ({ width: 0, height: 0 });
+Object.defineProperty(document, "images", { value: [...document.querySelectorAll("img")] });
 Object.defineProperty(document, "baseURI", { value: url });
 Object.defineProperty(document, "location", { value: { href: url } });
 const d = extract(document);
