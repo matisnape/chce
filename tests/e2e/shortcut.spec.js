@@ -5,6 +5,12 @@ import { reset, seedList, listIds, OWNER } from "./emulator.js";
 
 const FIXTURE = "http://localhost:4174/tests/fixtures";
 
+// The script's result is "b64=" + base64url of the JSON (see scripts/build-shortcut.mjs).
+const decode = (got) => {
+  expect(got).toMatch(/^b64=[A-Za-z0-9_-]*$/);
+  return JSON.parse(Buffer.from(got.slice(4), "base64url").toString("utf8"));
+};
+
 test.beforeEach(async () => {
   await reset();
   await seedList();
@@ -27,14 +33,14 @@ async function runShortcutScript(page, fixture) {
 test("the published script returns what extract(document) returns", async ({ page }) => {
   const { got, expected } = await runShortcutScript(page, "product-jsonld");
   expect(typeof got).toBe("string");
-  expect(JSON.parse(decodeURIComponent(got))).toEqual(expected);
+  expect(decode(got)).toEqual(expected);
   expect(expected.title).toBe("Lamp Aurora");
   expect(expected.images.length).toBeGreaterThan(0);
 });
 
 test("the published script reads a price kept only in a hidden input", async ({ page }) => {
   const { got, expected } = await runShortcutScript(page, "hidden-price");
-  expect(JSON.parse(decodeURIComponent(got))).toEqual(expected);
+  expect(decode(got)).toEqual(expected);
   expect(expected.price).toBe("499.9");
   expect(expected.currency).toBe("PLN");
 });
@@ -47,7 +53,7 @@ test("a page extract() cannot read still completes, with an empty result", async
     window.completion = resolve;
     (0, eval)(script);
   }), script);
-  expect(JSON.parse(decodeURIComponent(got))).toEqual({});
+  expect(decode(got)).toEqual({});
 });
 
 test("add.html opened without popup is prefilled and never tries to close itself", async ({ page }) => {
@@ -57,7 +63,7 @@ test("add.html opened without popup is prefilled and never tries to close itself
   await page.evaluate(({ email, password }) => window.__signInOwner(email, password), OWNER);
   await expect(page.locator("#add-item")).toBeVisible();
   const data = { title: "Lamp Aurora", price: "249.9", currency: "PLN", url: "https://shop.example/lamp", images: [] };
-  await page.goto(`/add.html?emulator#${encodeURIComponent(JSON.stringify(data))}`);
+  await page.goto(`/add.html?emulator#b64=${Buffer.from(JSON.stringify(data)).toString("base64url")}`);
   await expect(page.locator('[name="title"]')).toHaveValue("Lamp Aurora");
   await page.click('#add-form button[type="submit"]');
   await expect(page.locator("#saved")).toBeVisible();
@@ -82,6 +88,25 @@ test("the script's result, appended to add.html#, survives %, &, # and Polish le
   await page.goto(`/add.html?emulator#${result}`);
   await expect(page.locator('[name="title"]')).toHaveValue("100% żółć & co #1 ąęłń");
   await expect(page.locator('[name="url"]')).toHaveValue(`${FIXTURE}/price-meta.html?a=1&b=%25&c=za%C5%BC%C3%B3%C5%82%C4%87#frag`);
+});
+
+// Open URL runs link detection on its text: a percent-encoded shop URL in the hash ("…%2Fwww.shop.pl…")
+// was opened as extra tabs ("2fwww.shop.pl"). The result must hold nothing that reads as a domain.
+test("the script's result holds no dot, slash or percent sign for link detection to find", async ({ page }) => {
+  const { got, expected } = await runShortcutScript(page, "product-jsonld");
+  expect(expected.images.length).toBeGreaterThan(0);
+  expect(got).not.toMatch(/[./%:]/);
+});
+
+test("add.html still reads the bookmarklet's percent-encoded hash", async ({ page }) => {
+  await page.goto("/index.html?emulator");
+  await page.waitForFunction(() => window.__signInOwner);
+  await page.evaluate(({ email, password }) => window.__signInOwner(email, password), OWNER);
+  await expect(page.locator("#add-item")).toBeVisible();
+  const data = { title: "Zażółć 100%", url: "https://shop.example/a?b=1", images: [] };
+  await page.goto(`/add.html?emulator#${encodeURIComponent(JSON.stringify(data))}`);
+  await expect(page.locator('[name="title"]')).toHaveValue("Zażółć 100%");
+  await expect(page.locator('[name="url"]')).toHaveValue("https://shop.example/a?b=1");
 });
 
 test("bookmarklet.html hands out the shortcut with Polish setup steps", async ({ page }) => {

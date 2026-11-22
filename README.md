@@ -6,6 +6,8 @@ Both are built by `scripts/build-shortcut.mjs` from the same `js/shortcut.js` (i
 - `chce.shortcut` ("chce", daily use): the script is pasted into the Run JavaScript action as a literal. No code is fetched at run time. After any change to `js/extract.js` it must be re-downloaded and re-imported on the phone.
 - `chce-dev.shortcut` ("chce-dev", for testing): fetches `https://anks.pl/chce/js/shortcut.js` at run time, so a deploy reaches it with no re-import.
 
+The script returns the add page's hash as `b64=` + base64url JSON, not percent-encoding: Open URL runs link detection on its text, and a percent-encoded shop URL (`%2Fwww.shop.pl`) was opened as extra `2fwww.shop.pl` tabs. `add.html` reads both forms (the bookmarklet still sends percent-encoded JSON).
+
 Rebuild after changing `js/extract.js` or the build script:
 
 ```sh

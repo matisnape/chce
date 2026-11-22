@@ -80,5 +80,7 @@
     images,
   };
 })(document); } catch (e) {}
-  completion(encodeURIComponent(JSON.stringify(d)));
+  let s = "";
+  for (const b of new TextEncoder().encode(JSON.stringify(d))) s += String.fromCharCode(b);
+  completion("b64=" + btoa(s).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, ""));
 })();
