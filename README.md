@@ -6,6 +6,8 @@ Both are built by `scripts/build-shortcut.mjs` from the same `js/shortcut.js` (i
 - `chce.shortcut` ("chce", daily use): the script is pasted into the Run JavaScript action as a literal. No code is fetched at run time. After any change to `js/extract.js` it must be re-downloaded and re-imported on the phone.
 - `chce-dev.shortcut` ("chce-dev", for testing): fetches `https://anks.pl/chce/js/shortcut.js` at run time, so a deploy reaches it with no re-import.
 
+The script returns the whole add-page URL (`add.html#` + percent-encoded JSON, dots as `%2E`), and Open URL gets that result alone. Open URL runs link detection on each piece of its text: with a fixed `add.html#` in front, that prefix opened as an empty tab and every shop URL in the data (`%2Fwww.shop.pl`) as a `2fwww.shop.pl` tab.
+
 Rebuild after changing `js/extract.js` or the build script:
 
 ```sh

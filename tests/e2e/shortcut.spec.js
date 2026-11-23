@@ -5,6 +5,14 @@ import { reset, seedList, listIds, OWNER } from "./emulator.js";
 
 const FIXTURE = "http://localhost:4174/tests/fixtures";
 
+// The script's result is the whole add-page URL; its hash is the percent-encoded JSON (see scripts/build-shortcut.mjs).
+const ADD = "https://anks.pl/chce/add.html#";
+const hashOf = (got) => {
+  expect(got.startsWith(ADD)).toBe(true);
+  return got.slice(ADD.length);
+};
+const decode = (got) => JSON.parse(decodeURIComponent(hashOf(got)));
+
 test.beforeEach(async () => {
   await reset();
   await seedList();
@@ -27,14 +35,14 @@ async function runShortcutScript(page, fixture) {
 test("the published script returns what extract(document) returns", async ({ page }) => {
   const { got, expected } = await runShortcutScript(page, "product-jsonld");
   expect(typeof got).toBe("string");
-  expect(JSON.parse(decodeURIComponent(got))).toEqual(expected);
+  expect(decode(got)).toEqual(expected);
   expect(expected.title).toBe("Lamp Aurora");
   expect(expected.images.length).toBeGreaterThan(0);
 });
 
 test("the published script reads a price kept only in a hidden input", async ({ page }) => {
   const { got, expected } = await runShortcutScript(page, "hidden-price");
-  expect(JSON.parse(decodeURIComponent(got))).toEqual(expected);
+  expect(decode(got)).toEqual(expected);
   expect(expected.price).toBe("499.9");
   expect(expected.currency).toBe("PLN");
 });
@@ -47,7 +55,7 @@ test("a page extract() cannot read still completes, with an empty result", async
     window.completion = resolve;
     (0, eval)(script);
   }), script);
-  expect(JSON.parse(decodeURIComponent(got))).toEqual({});
+  expect(decode(got)).toEqual({});
 });
 
 test("add.html opened without popup is prefilled and never tries to close itself", async ({ page }) => {
@@ -79,9 +87,17 @@ test("the script's result, appended to add.html#, survives %, &, # and Polish le
   await page.waitForFunction(() => window.__signInOwner);
   await page.evaluate(({ email, password }) => window.__signInOwner(email, password), OWNER);
   await expect(page.locator("#add-item")).toBeVisible();
-  await page.goto(`/add.html?emulator#${result}`);
+  await page.goto(`/add.html?emulator#${hashOf(result)}`);
   await expect(page.locator('[name="title"]')).toHaveValue("100% żółć & co #1 ąęłń");
   await expect(page.locator('[name="url"]')).toHaveValue(`${FIXTURE}/price-meta.html?a=1&b=%25&c=za%C5%BC%C3%B3%C5%82%C4%87#frag`);
+});
+
+// Open URL runs link detection on its text: a percent-encoded shop URL in the hash ("…%2Fwww.shop.pl…")
+// was opened as extra tabs ("2fwww.shop.pl"). After the add-page address, nothing may read as a domain.
+test("the page data in the script's result holds no dot, slash or colon", async ({ page }) => {
+  const { got, expected } = await runShortcutScript(page, "product-jsonld");
+  expect(expected.images.length).toBeGreaterThan(0);
+  expect(hashOf(got)).not.toMatch(/[./:]/);
 });
 
 test("bookmarklet.html hands out the shortcut with Polish setup steps", async ({ page }) => {

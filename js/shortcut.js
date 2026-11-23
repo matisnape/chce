@@ -80,5 +80,5 @@
     images,
   };
 })(document); } catch (e) {}
-  completion(encodeURIComponent(JSON.stringify(d)));
+  completion("https://anks.pl/chce/add.html#" + encodeURIComponent(JSON.stringify(d)).replace(/\./g, "%2E"));
 })();
