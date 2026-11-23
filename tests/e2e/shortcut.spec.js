@@ -100,6 +100,25 @@ test("the page data in the script's result holds no dot, slash or colon", async 
   expect(hashOf(got)).not.toMatch(/[./:]/);
 });
 
+// What a phone produced: Open URL with "add.html#" before the result (itself a whole add URL) encodes
+// the result again. The old embedded shortcut's result arrives encoded twice, without the wrapping.
+for (const [name, wrap] of [
+  ["a whole add URL, encoded again, inside the hash", (j) => `https://anks.pl/chce/add.html${encodeURIComponent("#" + encodeURIComponent(j).replace(/\./g, "%2E"))}`],
+  ["JSON encoded twice", (j) => encodeURIComponent(encodeURIComponent(j))],
+]) {
+  test(`add.html reads ${name}`, async ({ page }) => {
+    await page.goto("/index.html?emulator");
+    await page.waitForFunction(() => window.__signInOwner);
+    await page.evaluate(({ email, password }) => window.__signInOwner(email, password), OWNER);
+    await expect(page.locator("#add-item")).toBeVisible();
+    const data = { title: "Zestaw Jetboil 100% (carbon)", price: "579.99", currency: "PLN", url: "https://8a.pl/zestaw?x=1&y=2", images: [] };
+    await page.goto(`/add.html?emulator#${wrap(JSON.stringify(data))}`);
+    await expect(page.locator('[name="title"]')).toHaveValue("Zestaw Jetboil 100% (carbon)");
+    await expect(page.locator('[name="url"]')).toHaveValue("https://8a.pl/zestaw?x=1&y=2");
+    await expect(page.locator('[name="price"]')).toHaveValue("579.99");
+  });
+}
+
 test("bookmarklet.html hands out the shortcut with Polish setup steps", async ({ page }) => {
   await page.goto("/bookmarklet.html?emulator");
   const link = page.locator("a#shortcut");

@@ -37,8 +37,17 @@ addEventListener("hashchange", () => location.reload());
 
 // The hash comes from whatever page the bookmarklet ran on, so this is the only guard on it:
 // keep known fields of the right type and length. The description is never taken from it.
+// The shortcut's Open URL percent-encodes its result once more when a fixed "add.html#" stands before
+// it, so the hash can be a whole add-page URL, encoded twice. Unwrap and decode until it is JSON.
 function readHash() {
-  try { return clean(JSON.parse(decodeURIComponent(location.hash.slice(1)))); } catch { return clean({}); }
+  let h = location.hash.slice(1);
+  for (let i = 0; i < 6; i++) {
+    try { return clean(JSON.parse(h)); } catch { /* not JSON yet */ }
+    const wrapped = h.indexOf("add.html#");
+    if (wrapped >= 0) h = h.slice(wrapped + "add.html#".length);
+    else try { h = decodeURIComponent(h); } catch { break; }
+  }
+  return clean({});
 }
 
 async function fillForm() {
