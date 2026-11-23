@@ -8,6 +8,8 @@ Both are built by `scripts/build-shortcut.mjs` from the same `js/shortcut.js` (i
 
 The script returns the whole add-page URL (`add.html#` + percent-encoded JSON, dots as `%2E`), and Open URL gets that result alone. Open URL runs link detection on each piece of its text: with a fixed `add.html#` in front, that prefix opened as an empty tab and every shop URL in the data (`%2Fwww.shop.pl`) as a `2fwww.shop.pl` tab.
 
+A fixed `add.html#` left before the result in Open URL (as in older imports) makes Shortcuts percent-encode the result once more, so `add.html` unwraps an add URL inside the hash and decodes until it reads JSON.
+
 Rebuild after changing `js/extract.js` or the build script:
 
 ```sh
